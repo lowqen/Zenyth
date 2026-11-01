@@ -198,13 +198,14 @@ fun DrawScope.drawBoard(
         if (tag.label.isNotEmpty() && m !in occupiedCells) {
             drawValueText(
                 cx(m.x), cy(m.y), geometry, tag.label, render.palette.textFor(tag), textScale, paints,
-                bold = tag.kind != TagKind.RATE,
+                bold = render.countLabels || tag.kind != TagKind.RATE,
+                digits = render.countLabels,
             )
         }
     }
     render.gradeMarks.forEach { (m, grade) ->
         if (m !in occupiedCells && sharesPoint(m)) {
-            drawGradeMark(grade, Offset(cx(m.x) + radius * 0.62f, cy(m.y) - radius * 0.62f), radius * 0.28f)
+            drawGradeMark(grade, Offset(cx(m.x) + radius * 0.62f, cy(m.y) - radius * 0.62f), radius * 0.34f)
         }
     }
     // database values and board texts, never over an analysis tag for the same point
@@ -402,6 +403,7 @@ private fun DrawScope.drawBadge(cx: Float, cy: Float, r: Float, quality: MoveQua
  * the largest, and the eye read size as importance. Now every label of up to
  * two characters is sized as the widest one could be (`W8`, bold), every
  * three-character label as `W88`; only longer, rarer labels fit themselves.
+ * [digits] labels (game counts) measure against `88` / `888` instead.
  */
 private fun DrawScope.drawValueText(
     cx: Float,
@@ -412,12 +414,13 @@ private fun DrawScope.drawValueText(
     textScale: Float,
     paints: BoardPaints,
     bold: Boolean = false,
+    digits: Boolean = false,
 ) {
     val r = geometry.radius
     var size = r * (if (text.length >= 4) 0.8f else if (text.length == 3) 0.9f else 1.05f) * textScale
     val reference = when {
-        text.length <= 2 -> "W8"
-        text.length == 3 -> "W88"
+        text.length <= 2 -> if (digits) "88" else "W8"
+        text.length == 3 -> if (digits) "888" else "W88"
         else -> text
     }
     // Measured at the bold weight, drawn at the label's own.

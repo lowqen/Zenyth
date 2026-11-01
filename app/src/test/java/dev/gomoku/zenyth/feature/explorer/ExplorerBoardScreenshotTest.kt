@@ -94,6 +94,7 @@ class ExplorerBoardScreenshotTest(private val dark: Boolean) {
             lastMove = stones.lastOrNull(),
             tags = marks.tags,
             gradeMarks = marks.grades,
+            countLabels = true,
         )
         val tag = if (dark) "dark" else "light"
         captureRoboImage("src/test/screenshots/${name}_$tag.png") {

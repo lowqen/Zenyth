@@ -241,6 +241,7 @@ private fun ExplorerBoard(
             lastMove = ui.stones.lastOrNull(),
             tags = marks.tags,
             gradeMarks = marks.grades,
+            countLabels = true,
         )
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {

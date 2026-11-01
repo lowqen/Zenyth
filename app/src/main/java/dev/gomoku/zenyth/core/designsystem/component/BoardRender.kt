@@ -54,6 +54,12 @@ data class BoardRender(
     val marks: Map<Move, BoardMark> = emptyMap(),
     /** 흑 5수 유불리 shapes on empty points (the opening explorer's next moves). */
     val gradeMarks: Map<Move, dev.gomoku.zenyth.core.model.OpeningEval.Grade> = emptyMap(),
+    /**
+     * The [tags] are game counts (`320`, `113k`), not win rates: drawn heavy and
+     * sized against digits rather than `W88`, whose wide W made a three-digit
+     * count read small. The opening explorer's board only.
+     */
+    val countLabels: Boolean = false,
 )
 /**
  * A game review at work, on the board itself (2026-10-31 — it replaced a
