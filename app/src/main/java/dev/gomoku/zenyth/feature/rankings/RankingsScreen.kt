@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
@@ -84,33 +85,21 @@ fun RankingsScreen(
     // instead of pinning half the screen.
     val dataForm = gameDataForm()
 
-    Column(modifier = modifier.fillMaxSize()) {
-        Header(ui, onFilter = viewModel::onOpenFilter)
-        ui.error?.let { ErrorBanner(it, viewModel::onDismissError) }
+    // Everything above the list scrolls away with it: the header, the 3/5-move
+    // switch and each tab's filters are the grid's first full-width items, not
+    // a column pinned over it — pinned, they kept a third of a phone screen for
+    // controls nobody touches while reading down the list. Scrolling back up
+    // brings them back.
+    val top: LazyGridScope.() -> Unit = {
+        fullWidth("header") { Header(ui, onFilter = viewModel::onOpenFilter) }
+        ui.error?.let { fullWidth("error") { ErrorBanner(it, viewModel::onDismissError) } }
+        fullWidth("tabs") { TabSwitch(ui.tab, viewModel::onSelectTab) }
+    }
 
-        // A segmented control, not a second tab row. This screen already sits
-        // inside the research tabs, and tabs nested in tabs read as one broken
-        // row rather than two levels; a segmented button says "two views of the
-        // same thing", which is what these are.
-        val tabs = listOf(
-            RankTab.THREE_MOVE to tr("3수 (주형)", "Move 3 (openings)", "第3手 (开局)"),
-            RankTab.FIVE_MOVE to tr("5수 모양", "Move 5 shapes", "第5手形状"),
-        )
-        SingleChoiceSegmentedButtonRow(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        ) {
-            tabs.forEachIndexed { i, (tab, label) ->
-                SegmentedButton(
-                    selected = ui.tab == tab,
-                    onClick = { viewModel.onSelectTab(tab) },
-                    shape = SegmentedButtonDefaults.itemShape(i, tabs.size),
-                ) { Text(label, maxLines = 1) }
-            }
-        }
-
+    Box(modifier = modifier.fillMaxSize()) {
         when (ui.tab) {
-            RankTab.THREE_MOVE -> ThreeMoveTab(ui, viewModel, dataForm, Modifier.weight(1f))
-            RankTab.FIVE_MOVE -> FiveMoveTab(ui, viewModel, dataForm, Modifier.weight(1f))
+            RankTab.THREE_MOVE -> ThreeMoveTab(ui, viewModel, dataForm, top, Modifier.fillMaxSize())
+            RankTab.FIVE_MOVE -> FiveMoveTab(ui, viewModel, dataForm, top, Modifier.fillMaxSize())
         }
     }
 
@@ -119,10 +108,38 @@ fun RankingsScreen(
     }
 }
 
+/** One item across the whole grid — the controls that lead each list. */
+private fun LazyGridScope.fullWidth(key: String, content: @Composable () -> Unit) {
+    item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
+}
+
+/**
+ * A segmented control, not a second tab row. This screen already sits inside
+ * the research tabs, and tabs nested in tabs read as one broken row rather
+ * than two levels; a segmented button says "two views of the same thing",
+ * which is what these are.
+ */
+@Composable
+private fun TabSwitch(current: RankTab, onSelect: (RankTab) -> Unit) {
+    val tabs = listOf(
+        RankTab.THREE_MOVE to tr("3수 (주형)", "Move 3 (openings)", "第3手 (开局)"),
+        RankTab.FIVE_MOVE to tr("5수 모양", "Move 5 shapes", "第5手形状"),
+    )
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        tabs.forEachIndexed { i, (tab, label) ->
+            SegmentedButton(
+                selected = current == tab,
+                onClick = { onSelect(tab) },
+                shape = SegmentedButtonDefaults.itemShape(i, tabs.size),
+            ) { Text(label, maxLines = 1) }
+        }
+    }
+}
+
 @Composable
 private fun Header(ui: RankingsUiState, onFilter: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -173,7 +190,13 @@ private fun ErrorBanner(message: String, onDismiss: () -> Unit) {
 // ---------------- 3-move tab ----------------
 
 @Composable
-private fun ThreeMoveTab(ui: RankingsUiState, vm: RankingsViewModel, dataForm: GameDataPrompt.Form, modifier: Modifier) {
+private fun ThreeMoveTab(
+    ui: RankingsUiState,
+    vm: RankingsViewModel,
+    dataForm: GameDataPrompt.Form,
+    top: LazyGridScope.() -> Unit,
+    modifier: Modifier,
+) {
     // A re-sorted or re-filtered list is a *new* list, and a lazy list keeps the
     // item that was on screen: it re-finds it by key and scrolls to wherever it
     // landed, which drops the user into the middle of a ranking they just asked
@@ -182,45 +205,46 @@ private fun ThreeMoveTab(ui: RankingsUiState, vm: RankingsViewModel, dataForm: G
     // alone, so an idle recomposition never yanks the scroll.
     val gridState = rememberLazyGridState()
     LaunchedEffect(ui.openingCards) { gridState.scrollToItem(0) }
-    Column(modifier) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DirectFilter.entries.forEach { df ->
-                ZenythFilterChip(selected = ui.directFilter == df, onClick = { vm.onDirectFilter(df) },
-                    label = { Text(when (df) {
-                        DirectFilter.ALL -> tr("전체", "All", "全部"); DirectFilter.DIRECT -> tr("직접(直)", "Direct", "直接(直)")
-                        DirectFilter.INDIRECT -> tr("간접(間)", "Indirect", "间接(间)")
-                    }) })
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 158.dp),
+        state = gridState,
+        modifier = modifier,
+        contentPadding = PaddingValues(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        top()
+        fullWidth("filters") {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    DirectFilter.entries.forEach { df ->
+                        ZenythFilterChip(selected = ui.directFilter == df, onClick = { vm.onDirectFilter(df) },
+                            label = { Text(when (df) {
+                                DirectFilter.ALL -> tr("전체", "All", "全部"); DirectFilter.DIRECT -> tr("직접(直)", "Direct", "直接(直)")
+                                DirectFilter.INDIRECT -> tr("간접(間)", "Indirect", "间接(间)")
+                            }) })
+                    }
+                }
+                // Its own line rather than the tail of the row above. The sort used to be
+                // one chip toggling two states, which fitted beside the 直/間 chips; three
+                // named orderings do not, and a `Row` does not wrap — it would have run
+                // the win-rate chip off the edge of a phone.
+                SortChips(ui.sortOptions(RankTab.THREE_MOVE), ui.threeSort, ui.scoringSide, vm::onThreeSort)
+                if (ui.freqLoaded) {
+                    Text(tr("필터 대국 %,d판", "%,d games match", "符合筛选 %,d 盘").format(ui.threeTotalGames),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
-        // Its own line rather than the tail of the row above. The sort used to be
-        // one chip toggling two states, which fitted beside the 直/間 chips; three
-        // named orderings do not, and a `Row` does not wrap — it would have run
-        // the win-rate chip off the edge of a phone.
-        SortChips(ui.sortOptions(RankTab.THREE_MOVE), ui.threeSort, ui.scoringSide, vm::onThreeSort)
-        if (ui.freqLoaded) {
-            Text(tr("필터 대국 %,d판", "%,d games match", "符合筛选 %,d 盘").format(ui.threeTotalGames),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
+        if (dataForm != GameDataPrompt.Form.NONE) {
+            fullWidth("game-data") { GameDataPromptSlot() }
         }
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 158.dp),
-            state = gridState,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            if (dataForm != GameDataPrompt.Form.NONE) {
-                item(key = "game-data", span = { GridItemSpan(maxLineSpan) }) { GameDataPromptSlot() }
-            }
-            items(ui.openingCards, key = { it.index }) { card ->
-                OpeningCardView(card, ui.freqLoaded, ui.threeTotalGames)
-            }
+        items(ui.openingCards, key = { it.index }) { card ->
+            OpeningCardView(card, ui.freqLoaded, ui.threeTotalGames)
         }
     }
 }
@@ -273,48 +297,58 @@ private fun OpeningCardView(card: OpeningCard, freqLoaded: Boolean, totalGames: 
 // ---------------- 5-move tab ----------------
 
 @Composable
-private fun FiveMoveTab(ui: RankingsUiState, vm: RankingsViewModel, dataForm: GameDataPrompt.Form, modifier: Modifier) {
+private fun FiveMoveTab(
+    ui: RankingsUiState,
+    vm: RankingsViewModel,
+    dataForm: GameDataPrompt.Form,
+    top: LazyGridScope.() -> Unit,
+    modifier: Modifier,
+) {
     // Same as the 3-move grid: a new ordering starts at the top. A filter change
     // can drop every visible key, so the list would otherwise hold a raw index —
-    // the middle of the old scroll.
+    // the middle of the old scroll. The search box is near the top, so typing
+    // into it never scrolls it out of sight.
     val fiveState = rememberLazyGridState()
     LaunchedEffect(ui.fiveRows) { fiveState.scrollToItem(0) }
-    Column(modifier) {
-        OutlinedTextField(
-            value = ui.fiveQuery, onValueChange = vm::onFiveQueryChange,
-            label = { Text(tr("수순 검색 (예: h8 i9)", "Search a move order (e.g. h8 i9)", "搜索手顺 (例: h8 i9)")) }, singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        )
-        SortChips(ui.sortOptions(RankTab.FIVE_MOVE), ui.fiveSort, ui.scoringSide, vm::onFiveSort)
-        // The same adaptive grid the 3-move tab uses: one column on a phone,
-        // two or more on a tablet, from one number instead of a breakpoint.
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 320.dp),
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            state = fiveState,
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (dataForm != GameDataPrompt.Form.NONE) {
-                // No data: the way to add it says why the list is empty.
-                item(key = "game-data", span = { GridItemSpan(maxLineSpan) }) { GameDataPromptSlot() }
-            } else if (ui.fiveRows.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    EmptyState(
-                        icon = Icons.Filled.BarChart,
-                        title = tr("표시할 모양이 없습니다", "Nothing to show", "没有可显示的形状"),
-                        body = tr(
-                            "검색이나 필터를 바꿔 보세요",
-                            "Try another search or filter",
-                            "请换一个搜索或筛选条件",
-                        ),
-                    )
-                }
+    // The same adaptive grid the 3-move tab uses: one column on a phone,
+    // two or more on a tablet, from one number instead of a breakpoint.
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 320.dp),
+        modifier = modifier,
+        state = fiveState,
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        top()
+        fullWidth("filters") {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                OutlinedTextField(
+                    value = ui.fiveQuery, onValueChange = vm::onFiveQueryChange,
+                    label = { Text(tr("수순 검색 (예: h8 i9)", "Search a move order (e.g. h8 i9)", "搜索手顺 (例: h8 i9)")) }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SortChips(ui.sortOptions(RankTab.FIVE_MOVE), ui.fiveSort, ui.scoringSide, vm::onFiveSort)
             }
-            items(ui.fiveRows, key = { it.repMoves }) { row ->
-                FiveRowView(row, ui.freqGameCount)
+        }
+        if (dataForm != GameDataPrompt.Form.NONE) {
+            // No data: the way to add it says why the list is empty.
+            fullWidth("game-data") { GameDataPromptSlot() }
+        } else if (ui.fiveRows.isEmpty()) {
+            fullWidth("empty") {
+                EmptyState(
+                    icon = Icons.Filled.BarChart,
+                    title = tr("표시할 모양이 없습니다", "Nothing to show", "没有可显示的形状"),
+                    body = tr(
+                        "검색이나 필터를 바꿔 보세요",
+                        "Try another search or filter",
+                        "请换一个搜索或筛选条件",
+                    ),
+                )
             }
+        }
+        items(ui.fiveRows, key = { it.repMoves }) { row ->
+            FiveRowView(row, ui.freqGameCount)
         }
     }
 }
@@ -369,7 +403,7 @@ private fun SortChips(
     onSort: (RankSort) -> Unit,
 ) {
     if (options.size < 2) return
-    ChipRow(Modifier.padding(horizontal = 12.dp, vertical = 2.dp)) {
+    ChipRow(Modifier.padding(vertical = 2.dp)) {
         options.forEach { sort ->
             ZenythFilterChip(
                 selected = current == sort,
@@ -387,7 +421,6 @@ private fun SortChips(
                 "对局数少的形状排在后面 (1 盘 100% 排在 20 盘 55% 之后)。"),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 12.dp),
         )
     }
 }
