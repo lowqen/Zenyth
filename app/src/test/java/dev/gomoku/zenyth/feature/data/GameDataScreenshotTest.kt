@@ -22,7 +22,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The game-data prompt of the research tabs (docs/보드-연구-개선-계획.md, R2):
+ * The game-data prompt of the research tabs (docs/engineering-notes.md §5, R2):
  * the card waiting, building and done, and the banner it folds into — light
  * and dark, at 1.0 and 1.3, like the other screenshot tests.
  */

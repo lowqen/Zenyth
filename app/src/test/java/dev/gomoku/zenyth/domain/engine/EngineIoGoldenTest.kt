@@ -8,7 +8,7 @@ import java.security.MessageDigest
 
 /**
  * The engine's read path, held to what it has always given
- * (docs/리팩토링-성능-위생-계획.md, Phase 7-6). For every stream of
+ * (docs/engineering-notes.md §3, Phase 7-6). For every stream of
  * [EngineStreams] — the grammar's corpus, two Rapfi-shaped searches, 30 000
  * seeded fuzz lines and 30 000 lines bent with Unicode — and every board
  * mapping: what [ResponseParser] makes of each line (or the failure it

@@ -1,7 +1,7 @@
 name: Perf baseline
 
 # The before/after numbers of the performance work
-# (docs/리팩토링-성능-위생-계획.md): engine-line allocation, the board view
+# (docs/engineering-notes.md §3): engine-line allocation, the board view
 # model's per-line cost, the board screen's recompositions, and the Compose
 # compiler's stability reports. The *BaselineTest classes measure only when
 # ZENYTH_PERF_OUT is set, which only this workflow does; they assert nothing.

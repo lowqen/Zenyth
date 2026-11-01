@@ -48,7 +48,7 @@ import dev.gomoku.zenyth.core.designsystem.theme.MOTION_QUICK
  * Four of them had grown up separately: the board's own pill, a `TabRow` on the
  * joseki and tools screens, a `ScrollableTabRow` on research, a
  * `SegmentedButton` on rankings. This is the board's pill, moved here so the
- * others could come to it (P0, P2, P4 of docs/UI-개편-마스터플랜.md). Material 3
+ * others could come to it (P0, P2, P4 of docs/engineering-notes.md §2). Material 3
  * 1.4 has no connected button group; when 1.5 brings one, this is the one place
  * that changes.
  *

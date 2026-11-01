@@ -83,7 +83,7 @@ val LocalOpenTour: ProvidableCompositionLocal<(() -> Unit)?> = staticComposition
 enum class TourPage { Board, Research, Joseki, Engine }
 
 /**
- * The tour of the four places (docs/온보딩-계획.md, O3), as Mornye's tour looks:
+ * The tour of the four places (docs/engineering-notes.md §6, O3), as Mornye's tour looks:
  * back and «건너뛰기» on top, a page that slides under the finger, the dots,
  * one full-width pill. Opened from Settings ▸ 정보, never on its own — the
  * first run is the two setup screens and then the board.

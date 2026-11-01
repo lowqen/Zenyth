@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
  * `Spacing.m` is reading these numbers too.
  *
  * Introduced with the values already in use — nothing on screen moved
- * (docs/UI-개편-마스터플랜.md, P0; the screenshot goldens check it).
+ * (docs/engineering-notes.md §2, P0; the screenshot goldens check it).
  */
 @Immutable
 data class ZenythTokens(

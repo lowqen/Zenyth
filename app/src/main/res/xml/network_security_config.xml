@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  HTTPS only, on every Android version this app installs on (docs/보안-강화-계획.md
+  HTTPS only, on every Android version this app installs on (docs/engineering-notes.md §4
   S8). Android 9 and later refuse cleartext by default; Android 8.x (minSdk 26)
   allows it, so a stray http:// would have gone out unencrypted there.
 

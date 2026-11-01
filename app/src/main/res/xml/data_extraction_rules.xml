@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  What Android 12+ backs up (docs/보안-강화-계획.md S12). Everything not named
+  What Android 12+ backs up (docs/engineering-notes.md §4 S12). Everything not named
   here goes: settings, saved boards, my joseki and lesson progress, and the
   database the engine learned (engine/rapfi.db).
 

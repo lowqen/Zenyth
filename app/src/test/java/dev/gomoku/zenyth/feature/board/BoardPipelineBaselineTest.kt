@@ -35,7 +35,7 @@ import java.time.Duration
 /**
  * What one engine line and one clock tick cost the board's view model: how
  * often `uiState` changes and what building it allocates on the main thread.
- * Phase 3's before and after (docs/리팩토링-성능-위생-계획.md). See [PerfBaseline].
+ * Phase 3's before and after (docs/engineering-notes.md §3). See [PerfBaseline].
  *
  * On the real main dispatcher — Robolectric's main looper, as in the app —
  * and not `Dispatchers.setMain`: the test main dispatcher builds an exception

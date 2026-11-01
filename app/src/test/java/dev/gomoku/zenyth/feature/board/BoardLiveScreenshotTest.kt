@@ -59,7 +59,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * The real [BoardScreen] — not its stateless parts — on a view model fed by
  * fakes, and a board with every overlay at once. Recorded before the
- * performance work (docs/리팩토링-성능-위생-계획.md, Phase 0) because that work
+ * performance work (docs/engineering-notes.md §3, Phase 0) because that work
  * rewires exactly what lies between the view model and these pixels: which
  * state each card reads, how the board is handed its render, how it draws.
  *

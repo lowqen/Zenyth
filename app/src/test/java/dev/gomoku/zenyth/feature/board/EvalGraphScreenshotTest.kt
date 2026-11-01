@@ -21,7 +21,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The evaluation graph (docs/보드-연구-개선-계획.md, R3), as the board sheet
+ * The evaluation graph (docs/engineering-notes.md §5, R3), as the board sheet
  * draws it — in the board's wood colours — light and dark, at 1.0 and 1.3.
  */
 @RunWith(ParameterizedRobolectricTestRunner::class)

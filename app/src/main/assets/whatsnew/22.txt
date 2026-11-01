@@ -5,7 +5,7 @@
 # the same number of items in each (WhatsNewTest).
 # versionCode 22 = the release after 0.16.0.
 #
-# DRAFT: only the onboarding group so far (docs/온보딩-계획.md, O4). At release,
+# DRAFT: only the onboarding group so far (docs/engineering-notes.md §6, O4). At release,
 # add the welcome sentence ("> ", WhatsNewTest asks for one in every language)
 # and the other changes since 0.16.0.
 

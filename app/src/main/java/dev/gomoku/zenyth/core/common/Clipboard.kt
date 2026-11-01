@@ -7,7 +7,7 @@ import androidx.compose.ui.platform.Clipboard
 /*
  * Plain text on the clipboard, as the deprecated ClipboardManager put and read
  * it, for its successor [Clipboard] (Phase 7-4 of
- * docs/리팩토링-성능-위생-계획.md): what is copied and what a paste reads are
+ * docs/engineering-notes.md §3): what is copied and what a paste reads are
  * unchanged.
  */
 

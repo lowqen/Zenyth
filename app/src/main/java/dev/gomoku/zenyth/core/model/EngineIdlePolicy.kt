@@ -7,7 +7,7 @@ package dev.gomoku.zenyth.core.model
  * its table and weights resident (0.3 ~ 0.5 GB on the Galaxy A16 — 256 MB table plus
  * the renju net), a server link keeps a remote process alive, and either keeps the
  * ongoing notification up. Starting again is cheap — the local engine is ready in
- * ~0.65 s (process 377 ms + weights 280 ms, docs/엔진-고도화-마스터플랜.md R2) — and
+ * ~0.65 s (process 377 ms + weights 280 ms, docs/engineering-notes.md §1 R2) — and
  * the session is brought back by itself when the app returns, so the wait can be
  * short: [PARK_AFTER_MS] covers a quick look at another app without paying for
  * the ones that never come back.

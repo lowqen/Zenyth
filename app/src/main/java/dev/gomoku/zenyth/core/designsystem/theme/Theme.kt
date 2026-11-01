@@ -126,7 +126,7 @@ private val LightColors = lightColors(ChromeRamps.Standard)
  * The two ramps the page is drawn from — the paper and the outlines.
  *
  * They are the only colour anything outside the app may move (decision D1 of
- * docs/UI-개편-마스터플랜.md). The wallpaper tone swaps their **hue** and keeps
+ * docs/engineering-notes.md §2). The wallpaper tone swaps their **hue** and keeps
  * their chroma, which is a few thousandths: the paper leans toward the
  * wallpaper, and nothing on screen starts to mean something. The accent
  * ([Violet], [Lilac]) does not follow the wallpaper — a wallpaper-green button

@@ -53,7 +53,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * The game's course, move by move (docs/보드-연구-개선-계획.md, R3). It was a
+ * The game's course, move by move (docs/engineering-notes.md §5, R3). It was a
  * 96dp line with a dot on every move over a faint fill — who stood better was
  * hard to read, and it did nothing when touched.
  *

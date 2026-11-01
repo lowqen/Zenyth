@@ -21,7 +21,7 @@ import kotlin.random.Random
 
 /**
  * Input the app does not choose: links any web page or app can send it, files
- * the user picks, the curriculum the network serves (docs/보안-강화-계획.md
+ * the user picks, the curriculum the network serves (docs/engineering-notes.md §4
  * Phase 2). Every reader here promises «null or an error message», so the bar
  * is simple — nothing throws.
  *

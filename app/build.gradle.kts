@@ -144,7 +144,7 @@ android {
 
 // `-PcomposeReports`: the compiler's verdict on every composable — skippable or
 // not, which parameters it takes for stable — written under build/compose_*.
-// The performance work reads these (docs/리팩토링-성능-위생-계획.md); an ordinary
+// The performance work reads these (docs/engineering-notes.md §3); an ordinary
 // build never sets the property and compiles exactly as before.
 composeCompiler {
     if (project.hasProperty("composeReports")) {
@@ -181,7 +181,7 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.truth)
 
-    // Screenshot tests (docs/UI-개편-마스터플랜.md P0). Test classpath only; the
+    // Screenshot tests (docs/engineering-notes.md §2 P0). Test classpath only; the
     // manifest artifact adds the empty test activity to debug builds alone.
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)

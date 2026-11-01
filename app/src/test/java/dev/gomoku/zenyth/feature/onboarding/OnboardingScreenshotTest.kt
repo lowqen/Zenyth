@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The first-run setup, photographed (docs/온보딩-계획.md, O2): each screen at a
+ * The first-run setup, photographed (docs/engineering-notes.md §6, O2): each screen at a
  * Galaxy A16's size, light and dark, at the default font scale and at 1.3 —
  * the same variants and the same rules as `DesignSystemScreenshotTest`.
  */

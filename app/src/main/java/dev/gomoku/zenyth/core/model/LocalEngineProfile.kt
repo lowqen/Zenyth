@@ -17,7 +17,7 @@ package dev.gomoku.zenyth.core.model
  *     anything a phone has — so the existing clamp does not catch this.
  * The defaults are the device's, not constants ([forDevice], R3): **every core**
  * and a table sized by RAM. Measured on a Galaxy A16 (2 big + 6 little cores,
- * docs/엔진-고도화-마스터플랜.md D4 · peak · R3): the little cores do add nodes —
+ * docs/engineering-notes.md §1 D4 · peak · R3): the little cores do add nodes —
  * 4 → 6 → 8 threads gave ×1.00 → ×1.24 → ×1.58 peak nodes/s on short searches,
  * and 8 against 4 scored +40 Elo over 70 games (not yet significant). The heat on long
  * analyses is the user's to trade back from the settings screen; the

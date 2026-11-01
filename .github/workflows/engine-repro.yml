@@ -3,7 +3,7 @@ name: Engine reproducibility
 # The engine binaries and weights in app/src/main are committed, built on a
 # developer machine (jniLibs/ENGINE_VERSION.txt). Nothing proved they come from
 # the source they name; a changed binary would ship unnoticed
-# (docs/보안-강화-계획.md S6, Phase 3).
+# (docs/engineering-notes.md §4 S6).
 #
 # This rebuilds them with tools/build_engine_android.sh — run as it is, not a
 # copy — and compares:

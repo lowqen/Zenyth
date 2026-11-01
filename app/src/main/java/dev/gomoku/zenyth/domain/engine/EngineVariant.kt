@@ -7,7 +7,7 @@ package dev.gomoku.zenyth.domain.engine
  *
  *  - [DOTPROD] is built for ARMv8.2 (`-march=armv8.2-a+dotprod`): the NNUE's
  *    int8 dot product becomes one `sdot` instead of four instructions, which
- *    measured **+30%** nodes/s on a Galaxy A16 (docs/엔진-고도화-마스터플랜.md, D0).
+ *    measured **+30%** nodes/s on a Galaxy A16 (docs/engineering-notes.md §1, D0).
  *  - [NEON] is plain ARMv8.0 and runs on every arm64 phone.
  *
  * Binary names must stay `lib*.so`: the package manager extracts nothing else,

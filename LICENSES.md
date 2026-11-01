@@ -88,7 +88,7 @@ GPLv3 §6(설치 정보)·§10(추가 제한 금지)과 Play 배포 계약이 �
 - ~~Rapfi 저작권자에게 추가 허가를 받거나~~ — **사실상 불가능하다.** Rapfi 는
   Stockfish 코드를 일부 채용했다고 `AUTHORS` 에 밝히고 있어(그리고 실제로
   `core/platform.cpp` 에 그 주석이 있다), 예외를 주려면 Stockfish 기여자
-  수백 명의 동의가 필요하다. 자세한 것은 `docs/licence-outreach.md`.
+  수백 명의 동의가 필요하다.
 - 법률 자문을 받는다.
 
 ---

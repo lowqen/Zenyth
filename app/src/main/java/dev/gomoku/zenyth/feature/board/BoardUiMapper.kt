@@ -33,7 +33,7 @@ import kotlinx.coroutines.flow.map
 
 /**
  * The board screen's state, built from what [BoardViewModel] holds (Phase 7-5 of
- * docs/리팩토링-성능-위생-계획.md). The view model drives the engine, the game and
+ * docs/engineering-notes.md §3). The view model drives the engine, the game and
  * the database; this turns the board, the reading, the panel and the settings
  * into [BoardUiState]. Moved out of the view model as it was.
  *

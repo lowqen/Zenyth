@@ -65,7 +65,7 @@ import org.robolectric.RuntimeEnvironment
 
 /*
  * Fakes for the board's view model, shared by [BoardViewModelTest] and the
- * Phase 0 baselines (docs/리팩토링-성능-위생-계획.md). The engine fake runs the
+ * Phase 0 baselines (docs/engineering-notes.md §3). The engine fake runs the
  * real [SearchAggregator] over the lines it is fed, as
  * `EngineRepositoryImpl.analyze` does, so its snapshots are the app's own.
  */

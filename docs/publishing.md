@@ -1,6 +1,6 @@
 # 배포 — GitHub Releases + F-Droid
 
-Play 스토어는 쓰지 않는다(이유는 `../LICENSES.md` §3, `licence-outreach.md` §0).
+Play 스토어는 쓰지 않는다(이유는 `../LICENSES.md` §3).
 GPL 앱의 본래 서식지 둘로 간다. **누구의 허락도 필요 없다** — GPL 은 배포를
 막지 않고 소스 공개와 고지를 요구할 뿐이며, 그건 이미 갖췄다.
 
@@ -100,13 +100,14 @@ apksigner lineage --in zenyth.lineage --print-certs
 
 ```bash
 # 1) 버전을 올린다 (app/build.gradle.kts)
-#      versionCode = 14      <- F-Droid 는 이 값으로 업데이트를 판단한다. 반드시 증가.
-#      versionName = "0.14.0"
+#      versionCode = 22      <- F-Droid 는 이 값으로 업데이트를 판단한다. 반드시 증가.
+#      versionName = "0.17.0"
 # 2) 릴리스 노트를 쓴다 — 파일 이름이 태그와 묶여 있다
-#      docs/release-notes-0.14.0.md
+#      docs/release-notes-0.17.0.md
+#      (지난 버전의 노트는 GitHub Releases 본문에 남는다 — 다음 릴리스 때 옛 파일은 지운다)
 # 3) 태그를 민다
-git tag -a v0.14.0 -m "Zenyth v0.14.0"
-git push origin v0.14.0
+git tag -a v0.17.0 -m "Zenyth v0.17.0"
+git push origin v0.17.0
 ```
 
 태그를 밀면 `build` job 이 **승인 대기**로 멈춘다. GitHub 의 Actions → 그 실행 → «Review deployments» →

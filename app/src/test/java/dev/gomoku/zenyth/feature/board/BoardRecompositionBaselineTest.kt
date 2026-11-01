@@ -38,7 +38,7 @@ import org.robolectric.annotation.Config
 /**
  * Which composables run, and how often, while an analysis streams into the
  * board screen and while a game's clock ticks — Phase 4's before and after
- * (docs/리팩토링-성능-위생-계획.md). See [PerfBaseline].
+ * (docs/engineering-notes.md §3). See [PerfBaseline].
  *
  * Counted with the runtime's own trace hook ([Composer.setTracer]): the
  * compiler brackets every composable body it does not skip with a trace event,

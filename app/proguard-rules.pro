@@ -1,4 +1,4 @@
-# Release shrinking (docs/리팩토링-성능-위생-계획.md, Phase 7-1). R8 removes what
+# Release shrinking (docs/engineering-notes.md §3, Phase 7-1). R8 removes what
 # nothing reaches and changes nothing it keeps: no optimisation (no inlining, no
 # class merging, no rewritten method bodies) and no renaming, so the code that
 # ships runs exactly as compiled and a stack trace reads without a mapping file.

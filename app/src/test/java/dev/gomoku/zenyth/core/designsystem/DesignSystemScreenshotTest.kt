@@ -104,7 +104,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * The design system, photographed — the baseline the UI overhaul is judged
- * against (docs/UI-개편-마스터플랜.md, P0).
+ * against (docs/engineering-notes.md §2, P0).
  *
  * Every part that can be drawn without a view model: the board with analysis
  * values on it, the eval bar, the move bar, the cards, the chips, the top bar.

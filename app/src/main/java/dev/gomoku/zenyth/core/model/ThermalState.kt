@@ -7,7 +7,7 @@ package dev.gomoku.zenyth.core.model
  * The out-of-box profile takes every core ([LocalEngineProfile.forDevice]) because
  * that is the fastest setting on a short search. On a long analysis it is also the
  * hottest: on the Galaxy A16 even 4 threads reached LIGHT inside five minutes
- * (docs/엔진-고도화-마스터플랜.md D4). Past that point the phone throttles the cores
+ * (docs/engineering-notes.md §1 D4). Past that point the phone throttles the cores
  * anyway, so the threads cost heat and battery without buying nodes — the cap below
  * gives them back before the system takes them.
  *

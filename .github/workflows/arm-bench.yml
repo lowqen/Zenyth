@@ -1,6 +1,6 @@
 name: ARM engine bench (D3)
 
-# Linux aarch64 stand-in for the phone (docs/엔진-고도화-마스터플랜.md D3). GitHub's ubuntu-24.04-arm runner
+# Linux aarch64 stand-in for the phone (docs/engineering-notes.md §1 D3). GitHub's ubuntu-24.04-arm runner
 # (Cobalt 100 / Neoverse N2, 4 cores, no SMT — dotprod and i8mm) is free for this public repo, does not throttle,
 # and has no battery to run flat mid-match like the Galaxy A16 did.
 #

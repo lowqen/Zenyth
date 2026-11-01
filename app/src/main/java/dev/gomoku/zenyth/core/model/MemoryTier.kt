@@ -3,7 +3,7 @@ package dev.gomoku.zenyth.core.model
 /**
  * The on-device engine's memory, as far as the phone's RAM is concerned (T3).
  *
- * Measured on the Galaxy A16 (docs/엔진-고도화-마스터플랜.md D5): the engine holds
+ * Measured on the Galaxy A16 (docs/engineering-notes.md §1 D5): the engine holds
  * **its hash table plus ~95 MB** (both renju nets, eight threads), and holds it from
  * the start — the table is zero-filled when it is allocated, so a long analysis
  * does not grow it. The table is therefore the one knob, and the tiers below are

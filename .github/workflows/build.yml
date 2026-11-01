@@ -139,7 +139,7 @@ jobs:
           org.gradle.workers.max=4
           PROPS
 
-      # The release build shrinks with R8 (docs/리팩토링-성능-위생-계획.md
+      # The release build shrinks with R8 (docs/engineering-notes.md §3
       # Phase 7-1). It runs on every push, unsigned, so a missing keep rule fails
       # here and not on a release day.
       - name: Assemble release APK (R8)

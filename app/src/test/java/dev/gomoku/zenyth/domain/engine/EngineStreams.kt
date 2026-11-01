@@ -4,7 +4,7 @@ import kotlin.random.Random
 
 /**
  * Engine output for the Phase 0 safety net and baselines
- * (docs/리팩토링-성능-위생-계획.md): every line shape the parser knows, a search
+ * (docs/engineering-notes.md §3): every line shape the parser knows, a search
  * the way Rapfi streams one, and seeded noise around both.
  */
 internal object EngineStreams {

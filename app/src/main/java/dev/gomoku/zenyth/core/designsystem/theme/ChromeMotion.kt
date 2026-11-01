@@ -12,7 +12,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * Motion for the chrome — sheets, toolbars, navigation, chips — and never for
  * the board.
  *
- * Decision D6 of the UI overhaul (docs/UI-개편-마스터플랜.md): the four rules in
+ * Decision D6 of the UI overhaul (docs/engineering-notes.md §2): the four rules in
  * Motion.kt stay the board's rules — the board, the eval bar and every live
  * number keep to height-and-opacity, 200 ms, no interpolated counts. What sits
  * around the board may move the way Material 3 Expressive moves: springs, which

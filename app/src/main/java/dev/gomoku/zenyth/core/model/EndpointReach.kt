@@ -9,7 +9,7 @@ package dev.gomoku.zenyth.core.model
  * therefore the network's: Tailscale encrypts it end to end (WireGuard), a home
  * network at least keeps it off the internet, and anything else sends every
  * position and command in the clear. The connection tab warns on [PUBLIC]
- * (docs/보안-강화-계획.md, Phase 5).
+ * (docs/engineering-notes.md §4 S11).
  */
 enum class EndpointReach {
     /** 100.64.0.0/10, fd7a:115c:a1e0::/48 or a MagicDNS `*.ts.net` name. */

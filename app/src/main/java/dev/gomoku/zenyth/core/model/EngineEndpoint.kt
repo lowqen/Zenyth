@@ -8,7 +8,7 @@ package dev.gomoku.zenyth.core.model
  * There is no default host. The address is the user's own server and nobody
  * else's — it used to default to the maintainer's tailnet node, which put a
  * private address in public source and pointed every install at a machine it
- * could not reach (docs/보안-강화-계획.md, Phase 5). Until one is typed the
+ * could not reach (docs/engineering-notes.md §4 S11). Until one is typed the
  * server engine cannot be started.
  */
 data class EngineEndpoint(

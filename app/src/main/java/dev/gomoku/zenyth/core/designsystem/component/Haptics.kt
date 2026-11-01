@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
  *
  * Named by what happened rather than by the vibration, so the board, the move
  * bar and a settings switch cannot drift into three vocabularies. Nothing calls
- * this yet; the board takes it up in P3 (docs/UI-개편-마스터플랜.md).
+ * this yet; the board takes it up in P3 (docs/engineering-notes.md §2).
  */
 class ZenythHaptics internal constructor(
     private val feedback: HapticFeedback,

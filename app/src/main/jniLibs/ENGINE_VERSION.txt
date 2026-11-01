@@ -12,5 +12,5 @@ size       : 1477144 / 1414072 bytes (stripped)
 built_at   : 2026-10-27
 bench(host): Hash: e240ab16  <- 폰의 BENCH Hash 가 이 값과 같아야 한다 (K1 · K2 · K3 · R4 · K7 · K6 PGO 는 결과 불변)
 bench(phone): Galaxy A16 (MT6789) cpu7 A76, 1 스레드 BENCH(번갈음, 모두 e240ab16) — 이 빌드 dotprod 65,063 · 66,462 · 66,297 ↔ 직전 탑재본(K3 + PGO) 65,596 · 66,472 · 66,838 (−0.5%, 잡음), NEON 45,418 · 45,211 ↔ 45,721 · 42,939
-             R4 P2-2: 스레드 4 → 2 → 6 으로 세 번 탐색할 때 가중치 적재 2회(직전 6회). ARM CI(N2, PGO 없음) 같은 트리 +2.14 · +4.52% — docs/엔진-고도화-마스터플랜.md R4 절
+             R4 P2-2: 스레드 4 → 2 → 6 으로 세 번 탐색할 때 가중치 적재 2회(직전 6회). ARM CI(N2, PGO 없음) 같은 트리 +2.14 · +4.52% — docs/engineering-notes.md §1 R4 절
 build_by   : Zenyth/tools/build_engine_android.sh

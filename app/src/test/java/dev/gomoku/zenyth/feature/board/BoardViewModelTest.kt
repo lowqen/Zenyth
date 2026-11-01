@@ -40,7 +40,7 @@ import org.robolectric.annotation.Config
 
 /**
  * What [BoardViewModel] promises the board screen, pinned before the
- * performance work (docs/리팩토링-성능-위생-계획.md, Phase 0): when a stopped
+ * performance work (docs/engineering-notes.md §3, Phase 0): when a stopped
  * search plays its move and when it does not, how a restart swallows the
  * cancelled search's reply, what the card and the board show, and which actions
  * a running review or proof locks.

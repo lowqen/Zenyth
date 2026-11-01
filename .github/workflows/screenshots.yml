@@ -1,6 +1,6 @@
 name: Screenshots
 
-# The design-system goldens (docs/UI-개편-마스터플랜.md, P0).
+# The design-system goldens (docs/engineering-notes.md §2, P0).
 #
 #  - push: verify against app/src/test/screenshots — any pixel that moved fails
 #    the run, and the diff images are uploaded so the change can be looked at.

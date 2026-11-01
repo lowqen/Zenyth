@@ -4,7 +4,7 @@ import java.io.File
 import java.lang.management.ManagementFactory
 
 /**
- * The before/after numbers of the performance work (docs/리팩토링-성능-위생-계획.md).
+ * The before/after numbers of the performance work (docs/engineering-notes.md §3).
  *
  * The baseline tests measure only when `ZENYTH_PERF_OUT` names a folder — the
  * `perf-baseline.yml` run sets it — and are skipped otherwise, so the ordinary

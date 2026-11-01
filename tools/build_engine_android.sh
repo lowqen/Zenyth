@@ -16,7 +16,7 @@ set -euo pipefail
 
 # 소스 고정. upstream HEAD 를 받으면 같은 스크립트가 날마다 다른 엔진을 만들고, 탑재본의
 # BENCH 해시(e240ab16)와 Zenyth Web 의 패치 기준(3c94c2a9)이 말없이 어긋난다. 올릴 때는 이 두 줄을
-# 바꾸고 [6/7] · [7/7] 의 해시를 새로 확인한다(docs/엔진-고도화-마스터플랜.md).
+# 바꾸고 [6/7] · [7/7] 의 해시를 새로 확인한다(docs/engineering-notes.md §1).
 RAPFI_COMMIT="3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7"     # dhbloo/rapfi
 NETWORKS_COMMIT="e32ad77a5364363b3e3a02b3f9e8610ade19ea98"  # dhbloo/rapfi-networks (Networks 서브모듈)
 
@@ -39,7 +39,7 @@ PATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/patches"
 #   PGO_MODE=generate 계측 빌드 — 소스 · 패치 · NDK 를 올렸을 때 프로필을 새로 뜨는 용도. 탑재하지 말 것
 #   PGO_MODE=off      프로필 없이(이전 방식)
 # PGO_TARGETS 는 폰에서 이득을 확인한 변형만 적는다. neon 은 같은 방법으로 +0.2%(잡음)라 뺐다
-# (docs/엔진-고도화-마스터플랜.md K6). generate 는 변형을 가리지 않는다.
+# (docs/engineering-notes.md §1 K6). generate 는 변형을 가리지 않는다.
 PGO_MODE="${PGO_MODE:-use}"
 PGO_TARGETS="dotprod"
 PGO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pgo"

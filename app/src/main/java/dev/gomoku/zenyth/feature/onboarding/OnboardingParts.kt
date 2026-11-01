@@ -72,7 +72,7 @@ import dev.gomoku.zenyth.feature.settings.CheckMark
 import kotlin.math.min
 
 /*
- * The first-run setup's parts, after Mornye's (docs/온보딩-계획.md §0): the
+ * The first-run setup's parts, after Mornye's (docs/engineering-notes.md §6): the
  * icon in a pale circle, the big heavy title, the ring that fills step by step,
  * the floating «다음» in the corner, and the card a done step turns into.
  * Colours are this app's roles in the places Mornye uses its own.

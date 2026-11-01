@@ -69,7 +69,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Leading people to the RenjuNet game data from the research tabs that need it
- * (docs/보드-연구-개선-계획.md, R2). The openings' frequencies, scores and
+ * (docs/engineering-notes.md §5, R2). The openings' frequencies, scores and
  * games and the rankings' real-game tables are empty without it, and the old
  * card — one line and a button that opened a dialog — sat mid-list where it
  * was easy to scroll past.

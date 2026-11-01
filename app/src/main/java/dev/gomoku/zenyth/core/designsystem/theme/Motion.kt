@@ -30,7 +30,7 @@ import androidx.compose.animation.shrinkVertically
  *  - **the prove heartbeat stays as it is.** That half-second blink is not
  *    decoration; it is the board saying the search is alive (main.c:9206).
  *
- * Since the UI overhaul (decision D6, docs/UI-개편-마스터플랜.md) these are the
+ * Since the UI overhaul (decision D6, docs/engineering-notes.md §2) these are the
  * rules of the **board area** — the board, the eval bar, the move bar and every
  * live number. The chrome around it (sheets, toolbars, navigation, chips) moves
  * with the springs in [ChromeMotion], and falls back to these when the system

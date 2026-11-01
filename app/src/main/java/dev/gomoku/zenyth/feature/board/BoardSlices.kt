@@ -17,7 +17,7 @@ import dev.gomoku.zenyth.core.model.StoneColor
 
 /*
  * What each card of the board screen reads, and nothing else (Phase 4 of
- * docs/리팩토링-성능-위생-계획.md). `uiState` changes with every engine line and
+ * docs/engineering-notes.md §3). `uiState` changes with every engine line and
  * every clock tick; a card handed the whole [BoardUiState] was composed again
  * each time, though for nearly every card nothing it shows had changed. Handed
  * its slice, a card is skipped until one of its own values changes: a slice is

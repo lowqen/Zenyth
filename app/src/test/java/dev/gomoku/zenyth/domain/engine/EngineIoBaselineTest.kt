@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * What the engine's read path costs per line: allocation and time for
  * [ResponseParser], then for [SearchAggregator] on top. Phase 2's before and
- * after (docs/리팩토링-성능-위생-계획.md). See [PerfBaseline].
+ * after (docs/engineering-notes.md §3). See [PerfBaseline].
  */
 class EngineIoBaselineTest {
 

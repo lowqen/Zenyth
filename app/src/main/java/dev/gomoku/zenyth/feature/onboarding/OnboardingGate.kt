@@ -16,7 +16,7 @@ import dev.gomoku.zenyth.core.common.isFreshInstall
 import dev.gomoku.zenyth.core.designsystem.component.LocalUiPrefs
 
 /**
- * The first-run setup (plan: `docs/온보딩-계획.md`): the few things worth asking
+ * The first-run setup (plan: `docs/engineering-notes.md §6`): the few things worth asking
  * before the board, on two screens at most. The tour of the tabs is not part of
  * it — it opens from Settings ▸ 정보 when someone wants it.
  *

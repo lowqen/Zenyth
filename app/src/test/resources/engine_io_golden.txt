@@ -1,4 +1,4 @@
-# The engine read path's golden (docs/리팩토링-성능-위생-계획.md, Phase 7-6): per stream
+# The engine read path's golden (docs/engineering-notes.md §3, Phase 7-6): per stream
 # of EngineStreams and per board mapping, the SHA-256 and count of what ResponseParser
 # gives for each line, then per stream and side, of every SearchAggregator snapshot.
 # Recorded by perf-baseline run 41054250947, in which EngineIoEquivalenceTest held the
