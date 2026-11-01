@@ -1,53 +1,204 @@
 <div align="center">
 
-# Zenyth
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/logo/zenyth-lockup-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/logo/zenyth-lockup-light.svg">
+  <img alt="Zenyth" src="docs/readme/logo/zenyth-lockup-light.svg" width="360" height="auto">
+</picture>
 
-**진짜 엔진이 폰 안에서 도는 오목·렌주 보드.**
-**서버도, 계정도 필요 없고, 오프라인에서 동작합니다. 엔진은 [Rapfi](https://github.com/dhbloo/rapfi) 입니다.**
+<p>
+  <b>진짜 엔진이 폰 안에서 도는 오목 · 렌주 보드.</b><br>
+  서버도, 계정도 필요 없고 오프라인에서 동작합니다. 엔진은 <a href="https://github.com/dhbloo/rapfi">Rapfi</a> 입니다.
+</p>
 
-<sub>예전 이름은 RapfiDroid 입니다.</sub>
-
-[![Build](https://github.com/lowqen/Zenyth/actions/workflows/build.yml/badge.svg)](https://github.com/lowqen/Zenyth/actions/workflows/build.yml)
-[![Release](https://img.shields.io/github/v/release/lowqen/Zenyth?include_prereleases&sort=semver)](https://github.com/lowqen/Zenyth/releases/latest)
-[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSES.md)
-[![Android](https://img.shields.io/badge/Android-8.0%2B%20arm64-3DDC84)](https://github.com/lowqen/Zenyth/releases/latest)
-
-[내려받기](#내려받기) · [기능](#기능) · [원리](#엔진이-폰에서-도는-방법) · [빌드](#소스에서-빌드하기) · [English](README.md)
+<p>
+  <a href="https://github.com/lowqen/Zenyth/actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/lowqen/Zenyth/build.yml?branch=main&style=flat-square&label=build"></a>
+  <a href="https://github.com/lowqen/Zenyth/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/lowqen/Zenyth?style=flat-square&color=65528A"></a>
+  <a href="#라이선스"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0--or--later-65528A?style=flat-square"></a>
+  <img alt="Android 8.0+ arm64" src="https://img.shields.io/badge/Android-8.0%2B%20arm64-3DDC84?style=flat-square&logo=android&logoColor=white">
+</p>
 
 </div>
 
-## 이게 뭔가요
+<p align="center">
+  <a href="https://github.com/lowqen/Zenyth/releases/latest">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/release-dark.svg">
+      <img alt="최신 릴리스 내려받기" src="docs/readme/badges/release-light.svg" height="56">
+    </picture>
+  </a>
+  <a href="https://github.com/ImranR98/Obtainium">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/obtainium-dark.svg">
+      <img alt="Obtainium 으로 자동 업데이트" src="docs/readme/badges/obtainium-light.svg" height="56">
+    </picture>
+  </a>
+</p>
 
-강한 오목 엔진은 전부 데스크톱 프로그램입니다. PC 와 콘솔을 전제하고, 보통은
-말을 걸 상대 기계 한 대를 더 요구합니다. Zenyth 는 공개된 것 중 가장 강한
-축에 드는 엔진인 [Rapfi](https://github.com/dhbloo/rapfi) 를 arm64 안드로이드로
-크로스 컴파일해서, 앱 안에서 **진짜 프로세스로** 돌립니다. 보드도, 분석도, 금수
-표시도, 국면 데이터베이스도 비행기 모드에서 그대로 동작합니다. 어디에도 열려
-있는 포트가 없습니다.
+<p align="center">
+  <a href="https://rapfiweb.pages.dev">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/web-dark.svg">
+      <img alt="브라우저에서 쓰는 Zenyth Web" src="docs/readme/badges/web-light.svg" height="56">
+    </picture>
+  </a>
+  <a href="README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/readme-en-dark.svg">
+      <img alt="English README" src="docs/readme/badges/readme-en-light.svg" height="56">
+    </picture>
+  </a>
+</p>
 
-인터페이스는 데스크톱 [Yixin-Board](https://github.com/dhbloo/Yixin-Board) 연구
-환경을 이식한 것입니다. 그래서 모바일용으로 줄인 일부가 아니라 엔진 파라미터와
-연구 도구가 통째로 건너왔습니다. 데스크톱 설정 67개가 전부 있고, PC 에서와 똑같은
-방식으로 엔진을 구동합니다.
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/screenshots-dark.svg"><img src="docs/readme/sections/screenshots-light.svg" height="32" align="top" alt=""></picture> 화면
 
-## 내려받기
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/showcase-dark.png">
+  <img src="docs/readme/showcase-light.png" width="100%" alt="Zenyth 화면: 환영, 분석 보드, 엔진 시트, 설정">
+</picture>
 
-[최신 릴리스](https://github.com/lowqen/Zenyth/releases/latest)에서 APK 를
-받으세요. 안드로이드가 「출처를 알 수 없는 앱」 설치를 한 번 물어봅니다.
+<p align="center"><sub>한국어 · English · 简体中文 을 지원합니다.</sub></p>
 
-스토어 없이 업데이트 알림을 받으려면
-[Obtainium](https://github.com/ImranR98/Obtainium) 을 설치하고 이 저장소 주소를
-추가하면 됩니다. 새 릴리스마다 알림이 오고 한 번 눌러 갱신됩니다.
+---
 
-**필요 사양**
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/features-dark.svg"><img src="docs/readme/sections/features-light.svg" height="32" align="top" alt=""></picture> 기능
 
-* 안드로이드 8.0 (API 26) 이상
-* **arm64** 기기. 구형 armeabi·x86 기기에서는 엔진이 실행되지 않습니다.
-* 저장공간 90 MB 정도. 신경망 가중치가 APK 안에 있어 첫 실행에 받을 것이 없습니다.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/engine-dark.svg">
+          <img src="docs/readme/features/engine-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>엔진이 폰 안에</b>
+      </p>
+      <p>
+        가장 강한 공개 오목 엔진 가운데 하나인 Rapfi 를 arm64 로 컴파일해 진짜 프로세스로
+        띄웁니다. PC 와 똑같은 수를 찾고, 코어 전부와 최신 폰의 빠른 명령어를 쓰며,
+        폰이 뜨거워지면 코어를 돌려줍니다.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/analysis-dark.svg">
+          <img src="docs/readme/features/analysis-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>분석 보드</b>
+      </p>
+      <p>
+        최선수 · 승률 · 평가 · 깊이, 평가 바, 합법 착점 전부의 값 오버레이, 끌어서 수를
+        옮기는 형세 그래프. 분석과 대국은 판이 따로라 분석에서 늘어놓은 수가 기보에
+        섞이지 않습니다.
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/play-dark.svg">
+          <img src="docs/readme/features/play-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>엔진과 대국</b>
+      </p>
+      <p>
+        흑/백 · 룰 · 시간 제어, 노드로 정하는 레벨 5단. 무제한으로 생각할 때는
+        「지금 두기」, 그리고 되돌리기 · 다시 하기 · 분기 이동.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/rules-dark.svg">
+          <img src="docs/readme/features/rules-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>프리스타일 · 표준 · 렌주</b>
+      </p>
+      <p>
+        규칙마다 전용 신경망을 모두 동봉했습니다. 렌주 금수(삼삼 · 사사 · 장련)는
+        두는 대로 표시되고, 근사치가 아니라 <b>엔진이 직접</b> 판정합니다.
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/review-dark.svg">
+          <img src="docs/readme/features/review-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>리뷰와 증명</b>
+      </p>
+      <p>
+        끝난 판을 한 수씩 되짚으며 평가가 실제로 뒤집힌 지점을 엔진이 짚어 줍니다.
+        평가만이 아니라 국면 증명도 시킬 수 있고, 깊이 예산은 직접 정합니다.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/openings-dark.svg">
+          <img src="docs/readme/features/openings-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>오프닝 익스플로러</b>
+      </p>
+      <p>
+        1~4수 이름 249개, 흑 5수 유불리 11등급(모양 1,889개), 환원 수순, 26주형 랭킹.
+        폰에서 직접 만든 실전 통계를 더할 수 있습니다.
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/joseki-dark.svg">
+          <img src="docs/readme/features/joseki-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>정석</b>
+      </p>
+      <p>
+        공식 커리큘럼을 살펴보거나 직접 수순을 맞히며 배웁니다(힌트 · 점수 · 진도).
+        새 레슨은 앱 업데이트 없이 들어옵니다. 갈래와 메모를 단 내 정석은 어느
+        국면에서든 다시 찾을 수 있습니다.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/offline-dark.svg">
+          <img src="docs/readme/features/offline-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>오프라인, 내 폰 안에서</b>
+      </p>
+      <p>
+        비행기 모드에서 동작합니다. 엔진이 배운 국면은 폰 안의 데이터베이스에 남습니다.
+        <code>.psq</code> / <code>.sav</code> 열기 · 저장, 데스크톱 <code>settings.txt</code>
+        가져오기 — Yixin-Board 설정 67개가 모두 있습니다.
+      </p>
+    </td>
+  </tr>
+</table>
 
-한국어 · 영어 · 중국어(간체)를 지원합니다.
+---
 
-### 받은 APK 확인하기
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/download-dark.svg"><img src="docs/readme/sections/download-light.svg" height="32" align="top" alt=""></picture> 내려받기
+
+[최신 릴리스](https://github.com/lowqen/Zenyth/releases/latest)에서 APK 를 받으세요.
+스토어 없이 업데이트 알림을 받으려면 [Obtainium](https://github.com/ImranR98/Obtainium)에
+이 저장소 주소를 추가하면 됩니다.
+
+| 필요한 것 | |
+|---|---|
+| Android | 8.0(API 26) 이상 |
+| CPU | **arm64**. 옛 armeabi · x86 기기에서는 엔진이 돌지 않습니다. |
+| 저장 공간 | 약 90 MB. 신경망이 APK 안에 들어 있어 처음 실행할 때 받는 것이 없습니다. |
+
+<details>
+<summary><b>받은 APK 확인하기</b></summary>
+<br>
 
 모든 릴리스 APK 는 같은 키로 서명됩니다. 그 인증서의 SHA-256 은
 
@@ -55,133 +206,99 @@
 F8:30:FF:50:9B:96:CB:A8:01:3E:B0:0D:1B:DB:C2:F4:FE:EF:41:C9:35:03:D5:06:B3:C9:DA:65:22:A9:B9:2E
 ```
 
-이름이 무엇이든 다른 키로 서명된 APK 는 이 프로젝트가 만든 것이 아닙니다. 확인 방법 셋, 쉬운 순서로:
+다른 키로 서명된 APK 는 이름이 무엇이든 이 프로젝트에서 나온 것이 아닙니다.
 
-* **폰에서**: [AppVerifier](https://github.com/soupslurpr/AppVerifier) 에 설치된 앱을 공유하거나,
-  `dev.gomoku.rapfidroid` 다음 줄에 위 지문을 붙여 넣습니다.
-* **안드로이드 SDK 로**: `apksigner verify --print-certs Zenyth-x.y.z.apk` 가
+* **폰에서**: [AppVerifier](https://github.com/soupslurpr/AppVerifier). 설치된 앱을 공유하거나,
+  `dev.gomoku.rapfidroid` 와 다음 줄에 위 지문을 붙여 넣습니다.
+* **Android SDK 로**: `apksigner verify --print-certs Zenyth-x.y.z.apk` 가
   `certificate SHA-256 digest: f830ff50…b92e` 를 출력합니다.
-* **어디서 빌드됐는지**: `gh attestation verify Zenyth-x.y.z.apk -R lowqen/Zenyth` 가 이 파일을 만든
-  커밋과 워크플로를 적은 서명된 빌드 출처 기록을 확인합니다(v0.16.0 다음 릴리스부터).
+* **어디서 빌드됐는지**: `gh attestation verify Zenyth-x.y.z.apk -R lowqen/Zenyth` 가 그 파일을
+  만든 커밋과 워크플로의 서명된 출처 기록을 확인합니다(v0.16.0 이후 릴리스).
 
-안드로이드는 다른 키로 서명된 업데이트를 거부하므로, 이 확인은 처음 설치할 때 가장 중요합니다.
-F-Droid 판은 F-Droid 키로 서명되어 지문이 다릅니다.
+Android 는 다른 키로 서명된 업데이트를 거부하므로, 이 확인은 처음 설치할 때 가장 중요합니다.
+F-Droid 판은 F-Droid 의 키로 서명되어 지문이 다릅니다.
 
-## 기능
+</details>
 
-### 두고 분석하기
+---
 
-* 앱을 열면 엔진이 저절로 뜨고, 보드는 **[분석] · [대국]** 두 탭입니다. 탭마다 판이
-  따로라 분석에서 늘어놓은 수가 대국 기보에 섞이지 않고, 두 판 모두 자동 저장됩니다
-* 분석: 최선수 · 승률 · 평가 · 깊이(세부 수치는 펼쳐서), 멈춘 뒤에도 직전 결과가
-  남고, 분석 시간 · 후보 수 · «정지하면 최선수 두기»는 접힌 설정에
-* 대국: 흑/백 · 시간 제어(칩 + 직접 입력) · 노드로 정하는 레벨 5단 · 룰셋,
-  무제한이면 「지금 두기」
-* 판 위 값은 동그라미 없이 **글자만**(파랑 → 초록 → 빨강), 판 옆 세로 평가 바
-* 국면 카드: 주형 이름 사슬과 흑 5수 유불리, 수 등급, DB 값 · 주석, 기보 메뉴
-  (열기 · .psq/.sav 저장 · Zenyth Web 링크 복사 · 이미지)
-* 렌주 금수 실시간 표시. 삼삼·사사·장련을 **엔진이 직접** 판정합니다(근사치가 아닙니다)
-* 프리스타일·표준·렌주 규칙, 각각 전용 신경망
-* 합법 착점 전부를 엔진 판단으로 색칠하는 보드 값 오버레이
-* 보드 이미지 저장, 데스크톱과 같은 텍스트 형식의 국면 복사·붙여넣기, 되돌리기와
-  분기 이동
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/engine-dark.svg"><img src="docs/readme/sections/engine-light.svg" height="32" align="top" alt=""></picture> 엔진이 폰에서 도는 방법
 
-### 연구하기
+Android 10 부터 앱은 패키지 관리자가 네이티브 라이브러리 폴더에 풀어 둔 파일만, 그것도
+이름이 `lib*.so` 일 때만 실행할 수 있습니다. 그래서 엔진은 `libengine.so` 라는 이름의 평범한
+PIE 실행 파일로 빌드되고, 데스크톱과 같은 piskvork 프로토콜로 stdin · stdout 을 주고받는
+**별도 프로세스**로 뜹니다. 화면은 데스크톱 [Yixin-Board](https://github.com/dhbloo/Yixin-Board)
+연구 환경을 옮긴 것이라 엔진 매개변수 전부가 축소 없이 넘어왔습니다.
 
-* **게임 리뷰.** 끝난 판을 한 수씩 되짚으며 평가가 실제로 뒤집힌 지점을 엔진이
-  짚어 줍니다.
-* **오프닝 익스플로러.** 눌러서 두는 판 위에 다음 수의 유불리 모양과 판 수를 그리고,
-  1~4수 이름 249개, 흑 5수 유불리 11등급(모양 1,889개), 환원 수순을 보여 줍니다.
-* **랭킹.** 26주형과 直·間 필터, 그리고 5수 모양 빈도.
-* **국면 증명.** 평가만이 아니라 증명을 시키고, 깊이 예산을 직접 정합니다.
-* **수순 탐색기**와 원시 프로토콜 명령을 넣는 엔진 콘솔.
+<details>
+<summary><b>왜 JNI 가 아니라 프로세스인가요?</b></summary>
+<br>
 
-### 정석
+1. Rapfi 는 해시 테이블을 잡지 못하면 `exit` 를 부릅니다. 앱 프로세스 안이라면 스택 트레이스도 없는 크래시입니다.
+2. 엔진은 작업 디렉터리를 바꿉니다. 라이브러리가 호스트에게 이러면 상관없는 코드가 깨집니다.
+3. 탐색은 앱을 되감지 않고 취소할 수 있어야 합니다.
+4. GPL-3.0 코드와 BSD-2-Clause 앱 사이의 경계를 깨끗하게 지킵니다.
 
-* **공식 커리큘럼.** 코스 › 레슨, 레슨마다 살펴보기(트리 · 해설 · 좋은 수 · 나쁜 수 ·
-  함정 · 응징)와 학습(수순을 직접 맞히기, 힌트 · 점수 · 진도). Zenyth Web 이 싣는 그 파일을
-  사이트에서 받아 오므로 새 레슨이 앱 업데이트 없이 들어오고, 레슨 링크
-  (`rapfiweb.pages.dev/joseki?lesson=…`)는 앱에서 열립니다.
-* **내 정석.** 판이나 `h8 i9 j10` 으로 수를 넣고, 갈래 · 평가 기호 · 마크다운 메모를
-  달고, 지금 보드 국면으로 찾습니다(대칭 포함). Zenyth Web 과 같은 JSON 으로 주고받습니다.
+</details>
 
-### 배운 것을 남기기
+<details>
+<summary><b>폰 빌드가 맞다는 건 어떻게 아나요?</b></summary>
+<br>
 
-* 엔진이 배운 국면을 폰 안의 데이터베이스 파일로 남기고 다음에 켤 때 이어 씁니다.
-  앱이 엔진을 내리기 전에 저장 명령을 먼저 보내므로, 강제 종료로 한 세션을 통째로
-  잃는 일이 없습니다.
-* 기보 불러오기·내보내기, 그리고 데스크톱이 쓰는 `settings.txt`·`settings_dev.txt`
-  파일을 그대로 주고받기.
+Rapfi 의 탐색 결과는 컴파일한 명령어 집합과 무관합니다(upstream 이 `-ffp-contract=off` 로
+빌드). 그래서 `BENCH` 명령은 폰에서도 x86 호스트와 같은 해시 `e240ab16` 을 내야 합니다.
+[빌드 스크립트](tools/build_engine_android.sh)는 aarch64 가 아니거나, `libc++_shared` 에
+기대거나, 그 플래그를 잃은 바이너리를 내지 않습니다. CI 는 엔진을 소스에서 다시 빌드해
+커밋된 바이너리와 대조합니다.
 
-## 엔진이 폰에서 도는 방법
+</details>
 
-당연하지 않은 부분이라 분명히 적어 둡니다.
+---
 
-안드로이드 10 부터 앱이 실행할 수 있는 파일은 **패키지 매니저가 네이티브 라이브러리
-디렉터리로 추출해 둔 것**뿐이고, 그것도 이름이 `lib*.so` 여야 합니다. 그래서 엔진은
-`libengine.so` 라는 이름의 평범한 PIE 실행 파일로 빌드되고, 패키지 매니저가 실제로
-추출하도록 레거시 jniLibs 패키징으로 담기며, 데스크톱과 똑같은 piskvork 프로토콜을
-stdin·stdout 으로 주고받는 **별도 프로세스**로 뜹니다.
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/faq-dark.svg"><img src="docs/readme/sections/faq-light.svg" height="32" align="top" alt=""></picture> 자주 묻는 질문
 
-JNI 가 아니라 별도 프로세스인 이유는 넷이고, 넷 다 실제로 물립니다.
+<details>
+<summary><b>오프닝 승률은 어디서 오나요?</b></summary>
+<br>
 
-1. Rapfi 는 트랜스포지션 테이블 할당에 실패하면 `exit` 를 부릅니다. 앱 프로세스
-   안이라면 스택 트레이스 없는 크래시입니다.
-2. 엔진이 작업 디렉터리를 바꿉니다. 호스트에 그 짓을 하는 라이브러리는 무관한
-   코드를 깨뜨립니다.
-3. 탐색은 앱을 풀지 않고 취소할 수 있어야 합니다.
-4. GPL-3.0 코드와 BSD-2-Clause 인 이 앱 사이의 경계가 깨끗해집니다.
+[RenjuNet](https://www.renju.net/game/) 대국 데이터베이스입니다 — 단, 직접 추가했을 때만.
+그 라이선스는 오프라인 개인 사용을 허락하고, 내용이나 **그로부터 파생된 모든 것**을 웹사이트 ·
+온라인 시스템에 넣는 것을 금지합니다. 그래서 데이터는 동봉하지도, 호스팅하지도, 받아 오지도
+않습니다. 앱이 변환 과정을 통째로 갖고 있어 폰에서 직접 통계를 만듭니다.
 
-빌드는 믿는 게 아니라 검증합니다. upstream 이 `-ffp-contract=off` 로 컴파일하기
-때문에 Rapfi 의 탐색 결과는 컴파일된 명령어 집합과 무관하고, 따라서 `BENCH` 가
-폰에서도 x86 호스트와 같은 해시 `e240ab16` 을 찍어야 합니다. 빌드 스크립트는
-aarch64 가 아니거나, `libc++_shared` 에 의존하거나, 저 플래그를 하나라도 잃은
-바이너리를 거부합니다.
-[tools/build_engine_android.sh](tools/build_engine_android.sh) 를 보세요.
+> 설정 ▸ **대국 데이터 추가** ▸ renju.net 열기 ▸ 받아 둔 XML 파일 고르기 ▸ 만들기
 
-## 실전 통계
+43 MB XML 을 정수 열로 흘려 읽고, 모든 앞 수순 국면을 64비트 증분 Zobrist 정규 해시로 세고,
+기수 정렬 한 번으로 팩을 만듭니다. 몇 초면 끝나고, 결과는 폰 밖으로 나가지 않습니다.
 
-오프닝 익스플로러와 랭킹의 실전 승률은 대국 데이터베이스가 있어야 채워집니다.
-그 데이터베이스는 [RenjuNet](https://www.renju.net/game/) 이고, 라이선스가 오프라인
-개인 사용은 허용하되 그 내용물 **또는 그로부터 파생된 무엇이든** 웹사이트나 온라인
-시스템에 올리는 것을 금지합니다.
+</details>
 
-그래서 앱은 그 자료를 동봉하지도, 호스팅하지도, 받아 오지도 않습니다. 대신 변환
-파이프라인 전체를 싣고 **기기 안에서** 팩을 만듭니다.
+<details>
+<summary><b>앱이 네트워크를 쓰나요?</b></summary>
+<br>
 
-> 설정 ▸ **대국 데이터 추가** ▸ renju.net 열기 ▸ 내려받은 XML 고르기 ▸ 만들기
+한 번, 그리고 끌 수 있습니다. 정석 탭이 Zenyth Web 이 싣는 정적 파일
+`https://rapfiweb.pages.dev/joseki/curriculum.json` 에서 공식 커리큘럼을 받아 옵니다. 사용자 · 기보 ·
+기기에 관한 것은 아무것도 보내지 않고, 바뀌지 않은 파일은 빈 응답으로 끝납니다.
+**설정 ▸ 정석 커리큘럼 자동 업데이트** 로 끕니다. 그 밖의 모든 것은 비행기 모드에서 동작합니다.
 
-파일은 사용자가 공식 출처에서 직접 받고, 변환은 사용자 폰이 하고, 결과는 기기를
-벗어나지 않습니다. 라이선스가 허용하는 유일한 경로이고, 대신 눌러 주는 다운로드
-버튼이 없는 이유이기도 합니다.
+</details>
 
-변환기는 Zenyth Web 의 고속 경로를 이식한 것입니다. 43MB XML 을 바이트 그대로 흘려
-읽어 대국을 정수 열에 쌓고, 모든 접두 국면을 **64비트 증분 Zobrist 정규 해시**(대칭
-8종마다 XOR 한 번)로 세어 기수 정렬 한 번으로 통계를 만듭니다. 예전의 문자열 키
-두 번 훑기가 몇 분 걸리던 것이 몇 초가 됩니다. 결과는 팩 파일 하나입니다. 해시가
-같으면 정규 국면 키도 같다는 것을 무작위 국면과 모든 대칭에서 시험이 확인합니다.
+<details>
+<summary><b>엔진을 PC 에서 돌릴 수도 있나요?</b></summary>
+<br>
 
-## 서버 모드
+네. 서버 모드는 다른 컴퓨터의 Rapfi 와 통신합니다 — 아주 큰 오프닝 데이터베이스나 몇 시간씩
+걸어 두는 분석에 씁니다. **기본으로 꺼져 있고** 고급 스위치 뒤에 있습니다.
 
-원래 구조는 PC 의 Rapfi 와 네트워크로 대화하는 것이었고, 폰이 도저히 못 당하는
-경우를 위해 그 모드도 남아 있습니다. 아주 큰 오프닝 데이터베이스나, 몇 시간씩
-걸어 두는 분석 같은 것입니다.
+연결은 piskvork 를 말하는 평문 TCP 라 자체 암호화 · 비밀번호가 없습니다. 그래서 Zenyth 는
+[Tailscale](https://tailscale.com) 안에서 쓰는 것을 전제로 하고, Tailscale 도 사설망도 아닌 주소에는
+경고를 띄웁니다. 서버 쪽에서는:
 
-**기본은 꺼져 있고 고급 설정 뒤에 있습니다.** 아래의 커리큘럼 파일 말고는, 직접 켜고
-주소를 넣기 전에는 이 앱의 어떤 부분도 네트워크에 접속하지 않습니다.
-
-### 서버 연결을 사적으로 두기
-
-이 연결은 piskvork 를 주고받는 평문 TCP 이고, 프로토콜 자체에는 암호화도 비밀번호도 없습니다.
-Zenyth 는 이 연결이 [Tailscale](https://tailscale.com) 안에서 돈다고 보고(WireGuard 터널이 암호화한다),
-입력한 주소가 Tailscale 이나 사설망 주소가 아니면 경고합니다. 서버 쪽에서는:
-
-* **tailnet 에서만 듣게.** `ss -ltnp | grep 5050` 이 `0.0.0.0:5050` 이나 `*:5050` 이 아니라 그 기계의
-  `100.x.y.z:5050` 을 보여야 합니다. 모든 주소에서 들으면 그 기계가 붙은 모든 네트워크에 — 공인 IP 가
-  있다면 인터넷에도 — 누구나 조종할 수 있는 엔진이 열립니다.
-* **내 기기만 들이게.** Tailscale 기본 정책은 tailnet 의 모든 기기가 모든 포트에 닿게 합니다. 서버에
-  태그를 달고 5050 은 내 로그인에서만 허용하세요. 기본 «모두 허용» 규칙이 정책에 남아 있는 한 이런 규칙은
-아무것도 막지 못하므로, 그 규칙을 실제로 쓰는 것들에 대한 규칙으로 바꿔야 합니다:
+* **tailnet 에서만 listen.** `ss -ltnp | grep 5050` 이 `0.0.0.0:5050` · `*:5050` 이 아니라
+  `100.x.y.z:5050` 을 보여야 합니다.
+* **내 기기만 들이기.** Tailscale 기본 정책은 모든 기기가 모든 포트에 닿게 합니다. 「모두 허용」
+  규칙을 이런 규칙으로 바꾸세요.
 
   ```json
   "tagOwners": { "tag:rapfi-server": ["autogroup:admin"] },
@@ -190,16 +307,40 @@ Zenyth 는 이 연결이 [Tailscale](https://tailscale.com) 안에서 돈다고 
   ]
   ```
 
-### 저절로 하는 요청 하나
+</details>
 
-정석 탭은 공식 커리큘럼을 `https://rapfiweb.pages.dev/joseki/curriculum.json` 에서
-받습니다. Zenyth Web 사이트가 보여 주는 바로 그 파일이라, 새 레슨이 앱 업데이트 없이
-들어옵니다. 정적 파일 하나를 받는 요청이고 사용자 · 기보 · 기기에 관한 정보는 아무것도
-보내지 않으며, 바뀌지 않았으면 빈 응답 하나로 끝납니다. **설정 ▸ 정석 커리큘럼 자동
-업데이트**로 끌 수 있고, 꺼도 새로 고침 단추와 레슨 링크는 누를 때 받습니다. 그 밖의
-모든 것은, 폰에 이미 있는 커리큘럼까지 포함해, 비행기 모드에서 그대로 동작합니다.
+<details>
+<summary><b>왜 arm64 만 되나요?</b></summary>
+<br>
 
-## 소스에서 빌드하기
+엔진은 arm64-v8a 용으로 빌드 · 검증한 네이티브 코드이고, 요즘 안드로이드 폰은 사실상 모두
+arm64 입니다. CPU 에 내적 명령어가 있으면 더 빠른 dotprod 빌드를, 없으면 NEON 빌드를 실행할
+때 고릅니다.
+
+</details>
+
+<details>
+<summary><b>왜 Google Play 에 없나요?</b></summary>
+<br>
+
+APK 에 GPL-3.0 인 Rapfi 가 들어 있고, GPL-3.0 제6조 · 제10조가 Play 배포 약관과 충돌해 올릴 수
+없습니다. 선택이 아니라 라이선스의 결과입니다. GitHub Releases · Obtainium · F-Droid 가 GPL 앱의
+본래 자리이고, F-Droid 레시피는 [`fdroid/`](fdroid/) 에 있습니다.
+
+</details>
+
+<details>
+<summary><b>Rapfi 공식 앱인가요?</b></summary>
+<br>
+
+아닙니다. Zenyth 는 비공식 이식판입니다. Rapfi 는 [dhbloo](https://github.com/dhbloo) 의 작품이고,
+이 프로젝트는 그것을 안드로이드용으로 묶고 연구용 화면을 얹었습니다. 예전 이름은 RapfiDroid 입니다.
+
+</details>
+
+---
+
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/development-dark.svg"><img src="docs/readme/sections/development-light.svg" height="32" align="top" alt=""></picture> 개발
 
 ```bash
 git clone https://github.com/lowqen/Zenyth.git
@@ -207,65 +348,56 @@ cd Zenyth
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-Android Studio Ladybug 이상, JDK 17, compileSdk 35. 저장소에 `libengine.so` 가
-들어 있어서 클론 직후 바로 빌드되고 실행됩니다. 엔진을 직접 다시 빌드하려면
-[tools/build_engine_android.sh](tools/build_engine_android.sh) 가 NDK 설치부터
-결과 바이너리 검증까지 전부 하고,
-[app/src/main/jniLibs/ENGINE_VERSION.txt](app/src/main/jniLibs/ENGINE_VERSION.txt)
-에 커밋된 바이너리가 어느 엔진 커밋에서 나왔는지 적혀 있습니다.
-
-유닛 테스트는 push 마다 돕니다. 엔진 문법, 국면 키, 팩 리더·라이터, 설정 코덱,
-오프닝 표를 덮고 있고, 정규 키 같은 것을 리팩터링해도 되는 이유가 바로 이것입니다.
-
-### 구조
+JDK 17 과 최신 Android Studio(AGP 9.5, compileSdk 37). 빌드된 `libengine.so` 가 커밋돼 있어
+클론하자마자 빌드됩니다. [`tools/build_engine_android.sh`](tools/build_engine_android.sh) 가 엔진을
+다시 빌드 · 검증하고, [`ENGINE_VERSION.txt`](app/src/main/jniLibs/ENGINE_VERSION.txt) 에 정확한 엔진
+커밋이 적혀 있습니다. 단위 테스트와 스크린샷 골든은 push 마다 돕니다.
 
 ```
 app/src/main/java/dev/gomoku/zenyth/
-  core/         보드 모델, 국면 키, 설정 표, 디자인 시스템
-  data/         엔진 전송 계층, 스토어, 팩·DB 입출력
-  domain/       엔진 세션, RIF 파싱, 집계, 팩 쓰기
-  feature/      보드, 연구, DB, 연결, 설정, 첫 실행
-tools/          엔진 크로스 컴파일과 검증
-fdroid/         F-Droid 메타데이터와 빌드 레시피
-docs/           배포, 라이선스 정리, 릴리스 노트
+  core/      보드 모델, 국면 키, 설정 표, 디자인 시스템
+  data/      엔진 연결, 저장소, 팩 · 데이터베이스 입출력
+  domain/    엔진 세션, RIF 파싱, 집계, 팩 쓰기
+  feature/   보드, 연구, 정석, 연결, 설정, 온보딩
+tools/       엔진 크로스 컴파일, 패치, PGO 프로필
+fdroid/      F-Droid 메타데이터와 빌드 레시피
+docs/        배포, 개발 기록, 릴리스 노트
 ```
 
-## 릴리스
+릴리스는 태그 하나로 끝납니다. CI 가 RenjuNet 파생 데이터가 든 빌드나 Android 가 실행할 수 없는
+엔진을 거부합니다 — [docs/publishing.md](docs/publishing.md). 설계 결정과 측정은
+[docs/engineering-notes.md](docs/engineering-notes.md), 보안 제보는 [SECURITY.md](SECURITY.md).
 
-태그를 밀면 CI 가 나머지를 합니다. 나쁜 APK 를 내보내느니 릴리스를 실패시키는
-게이트가 둘 있습니다. 하나는 RenjuNet 파생 자료가 섞인 빌드를 거부하고, 다른
-하나는 엔진이 들어 있고 안드로이드가 실제로 실행할 수 있는 형태로 담겼는지
-확인합니다. [docs/publishing.md](docs/publishing.md) 를 보세요.
+---
 
-## 라이선스
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/credits-dark.svg"><img src="docs/readme/sections/credits-light.svg" height="32" align="top" alt=""></picture> 감사
 
-Zenyth 자체 소스는 **BSD-2-Clause** 입니다. 배포되는 APK 에는 Rapfi 엔진이
-함께 들어가고 그것이 **GPL-3.0-or-later** 이므로, 패키지 전체는
-GPL-3.0-or-later 로 배포됩니다.
+<p align="center">
+  <a href="https://github.com/dhbloo/rapfi"><b>Rapfi</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/dhbloo/rapfi-networks"><b>rapfi-networks</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/dhbloo/Yixin-Board"><b>Yixin-Board</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/accreator/Yixin-Board"><b>Yixin-Board (Kai Sun)</b></a> &nbsp;·&nbsp;
+  <a href="https://www.renju.net/"><b>RenjuNet</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/orioncactus/pretendard"><b>Pretendard</b></a>
+</p>
 
-릴리스 APK 에 들어간 엔진의 대응 소스는 **https://github.com/lowqen/rapfi** 의
-`android` 브랜치이고, 릴리스마다 태그 `zenyth-v<버전>` 이 있습니다(0.16.0:
-upstream `3c94c2a9` + 안드로이드 빌드를 위한 `Rapfi/CMakeLists.txt` 블록 두 개 +
-결과를 바꾸지 않는 패치(속도 · 스레드 변경 때 가중치 재적재 없음)를 커밋 하나씩, `android/` 에 빌드 옵션과 dotprod
-판의 PGO 프로필).
+[dhbloo](https://github.com/dhbloo) 는 이 앱을 쓸 만하게 만드는 엔진 Rapfi 와, 이 화면이 따르는
+Yixin-Board 포크를 만들었습니다. Kai Sun 은 원래의 Yixin-Board(BSD-2-Clause, 2009 ~ 2017)를
+만들었습니다. 신경망 가중치는 CC0 1.0 입니다. 이들 누구에게도 허락이 필요하지 않았고 구하지도
+않았습니다 — 라이선스가 요구하는 것은 고지와 소스이고, 둘 다 여기 있습니다.
 
-전체 서드파티 고지는 [LICENSES.md](LICENSES.md) 에 있고, GPL-3.0 과 BSD-2-Clause
-전문은 앱 안 설정 ▸ 정보 ▸ 라이선스 에 동봉돼 있습니다.
+---
 
-이 앱은 구글 플레이에 올릴 수 없습니다. 선택이 아니라 GPL-3.0 6조·10조와 플레이
-배포 약관이 충돌한 결과입니다.
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/licence-dark.svg"><img src="docs/readme/sections/licence-light.svg" height="32" align="top" alt=""></picture> 라이선스
 
-## 감사
+Zenyth 자체 소스는 **BSD-2-Clause** 입니다. 배포되는 APK 에는 **GPL-3.0-or-later** 인 Rapfi 엔진도
+들어 있으므로, 패키지 전체는 GPL-3.0-or-later 로 배포됩니다.
 
-* **[dhbloo](https://github.com/dhbloo)** 님. 이 앱을 쓸 만하게 만들어 주는 엔진
-  [Rapfi](https://github.com/dhbloo/rapfi) 와, 이 인터페이스가 따라간
-  [Yixin-Board](https://github.com/dhbloo/Yixin-Board) fork.
-* **Kai Sun** 님. 원본 [Yixin-Board](https://github.com/accreator/Yixin-Board),
-  BSD-2-Clause, 저작권 2009 ~ 2017.
-* **[rapfi-networks](https://github.com/dhbloo/rapfi-networks)** 신경망 가중치,
-  CC0 1.0.
-* **[RenjuNet](https://www.renju.net/)** 사용자가 자기 통계를 만드는 근거가 되는
-  대국 데이터베이스.
+각 릴리스에 든 엔진의 대응 소스는 **[lowqen/rapfi](https://github.com/lowqen/rapfi)** 의 `android`
+브랜치, 태그 `zenyth-v<버전>` 입니다: upstream `3c94c2a9` 위에 안드로이드 빌드용
+`Rapfi/CMakeLists.txt` 블록 둘과 결과가 바뀌지 않는 속도 패치들, 각각 커밋 하나씩. 제3자 고지 전체는
+[LICENSES.md](LICENSES.md) 에 있고, GPL-3.0 · BSD-2-Clause 전문은 앱의 설정 ▸ 오픈소스 라이선스에
+들어 있습니다.
 
-이 중 누구에게도 허락을 받을 필요가 없었고, 받지도 않았습니다. 저 라이선스들이
-요구하는 것은 고지와 소스이며, 둘 다 위에 있습니다.
+> [!TIP]
+> **저장소에 Star** 를 누르면 새 릴리스 알림을 GitHub 에서 바로 받을 수 있습니다.

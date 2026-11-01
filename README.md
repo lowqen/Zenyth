@@ -1,54 +1,212 @@
 <div align="center">
 
-# Zenyth
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/logo/zenyth-lockup-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/logo/zenyth-lockup-light.svg">
+  <img alt="Zenyth" src="docs/readme/logo/zenyth-lockup-light.svg" width="360" height="auto">
+</picture>
 
-**A gomoku and renju board with a real engine running on your phone.**
-**No server. No account. Works offline. Powered by [Rapfi](https://github.com/dhbloo/rapfi).**
+<p>
+  <b>A gomoku and renju board with a real engine running on your phone.</b><br>
+  No server. No account. Works offline. Powered by <a href="https://github.com/dhbloo/rapfi">Rapfi</a>.
+</p>
 
-<sub>Formerly RapfiDroid.</sub>
-
-[![Build](https://github.com/lowqen/Zenyth/actions/workflows/build.yml/badge.svg)](https://github.com/lowqen/Zenyth/actions/workflows/build.yml)
-[![Release](https://img.shields.io/github/v/release/lowqen/Zenyth?include_prereleases&sort=semver)](https://github.com/lowqen/Zenyth/releases/latest)
-[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSES.md)
-[![Android](https://img.shields.io/badge/Android-8.0%2B%20arm64-3DDC84)](https://github.com/lowqen/Zenyth/releases/latest)
-
-[Download](#download) · [Features](#features) · [How it works](#how-the-engine-runs-on-your-phone) · [Build](#building-from-source) · [한국어](README.ko.md)
+<p>
+  <a href="https://github.com/lowqen/Zenyth/actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/lowqen/Zenyth/build.yml?branch=main&style=flat-square&label=build"></a>
+  <a href="https://github.com/lowqen/Zenyth/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/lowqen/Zenyth?style=flat-square&color=65528A"></a>
+  <a href="#licence"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0--or--later-65528A?style=flat-square"></a>
+  <img alt="Android 8.0+ arm64" src="https://img.shields.io/badge/Android-8.0%2B%20arm64-3DDC84?style=flat-square&logo=android&logoColor=white">
+</p>
 
 </div>
 
-## What this is
+<p align="center">
+  <a href="https://github.com/lowqen/Zenyth/releases/latest">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/release-dark.svg">
+      <img alt="Download the latest release" src="docs/readme/badges/release-light.svg" height="56">
+    </picture>
+  </a>
+  <a href="https://github.com/ImranR98/Obtainium">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/obtainium-dark.svg">
+      <img alt="Auto-update with Obtainium" src="docs/readme/badges/obtainium-light.svg" height="56">
+    </picture>
+  </a>
+</p>
 
-Strong gomoku engines are desktop programs. They expect a PC, a console, and
-usually a second machine to talk to. Zenyth is an unofficial Android port that takes one of the strongest open engines available, [Rapfi](https://github.com/dhbloo/rapfi), compiles it for
-arm64 Android, and runs it as a real process inside the app. The board, the
-analysis, the forbidden point marking and the position database all work in
-airplane mode, on a phone, with nothing listening on a port anywhere.
+<p align="center">
+  <a href="https://rapfiweb.pages.dev">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/web-dark.svg">
+      <img alt="Zenyth Web, in the browser" src="docs/readme/badges/web-light.svg" height="56">
+    </picture>
+  </a>
+  <a href="README.ko.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/readme-ko-dark.svg">
+      <img alt="한국어 README" src="docs/readme/badges/readme-ko-light.svg" height="56">
+    </picture>
+  </a>
+</p>
 
-The interface is a port of the desktop
-[Yixin-Board](https://github.com/dhbloo/Yixin-Board) study environment, so the
-full set of engine parameters and study tools came across rather than a reduced
-mobile subset. All 67 desktop settings are present and they drive the engine the
-same way they do on a PC.
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/screenshots-dark.svg"><img src="docs/readme/sections/screenshots-light.svg" height="32" align="top" alt=""></picture> Screenshots
 
-## Download
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/showcase-dark.png">
+  <img src="docs/readme/showcase-light.png" width="100%" alt="Zenyth screens: welcome, analysis board, engine sheet and settings">
+</picture>
+
+<p align="center"><sub>Shown in Korean. The app speaks English, Korean and Simplified Chinese (简体中文).</sub></p>
+
+---
+
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/features-dark.svg"><img src="docs/readme/sections/features-light.svg" height="32" align="top" alt=""></picture> Features
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/engine-dark.svg">
+          <img src="docs/readme/features/engine-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>The engine is on your phone</b>
+      </p>
+      <p>
+        Rapfi, one of the strongest open gomoku engines, compiled for arm64 and
+        run as a real process. It finds exactly the moves it finds on a PC, uses
+        every core and the fast instructions modern phones have, and gives cores
+        back when the phone gets hot.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/analysis-dark.svg">
+          <img src="docs/readme/features/analysis-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>Analysis board</b>
+      </p>
+      <p>
+        Best move, win rate, eval and depth, an eval bar, a value overlay on
+        every legal point and an evaluation graph you can scrub. Analysis and
+        Play each keep their own board, so explored lines never leak into the
+        game record.
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/play-dark.svg">
+          <img src="docs/readme/features/play-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>Play the engine</b>
+      </p>
+      <p>
+        Pick colours, rules and a time control, and five strength levels set by
+        nodes. "Move now" when the engine thinks without a limit, plus undo,
+        redo and branch navigation.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/rules-dark.svg">
+          <img src="docs/readme/features/rules-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>Freestyle, standard and renju</b>
+      </p>
+      <p>
+        Each rule has its own neural network, all bundled. Renju forbidden
+        points (double three, double four, overline) are marked as you play,
+        judged by the engine itself rather than approximated.
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/review-dark.svg">
+          <img src="docs/readme/features/review-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>Review and proof</b>
+      </p>
+      <p>
+        Walk a finished game move by move with the engine marking where the
+        evaluation actually turned. Ask it to prove a position rather than only
+        evaluate it, with a depth budget you control.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/openings-dark.svg">
+          <img src="docs/readme/features/openings-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>Opening explorer</b>
+      </p>
+      <p>
+        249 named openings, an eleven-grade evaluation of Black's fifth move over
+        1,889 shapes, the transpositions between them, and rankings of the 26
+        classical openings. Add real game statistics built on your own phone.
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/joseki-dark.svg">
+          <img src="docs/readme/features/joseki-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>Joseki</b>
+      </p>
+      <p>
+        An official curriculum of lessons to browse or play through yourself,
+        with hints, a score and progress; new lessons arrive without an app
+        update. Keep your own joseki with branches and notes, found again from
+        any position.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features/offline-dark.svg">
+          <img src="docs/readme/features/offline-light.svg" width="56" height="56" alt="">
+        </picture>
+        <br><b>Yours, offline</b>
+      </p>
+      <p>
+        Works in airplane mode. The engine keeps what it learns in a database on
+        your phone. Open and save <code>.psq</code> / <code>.sav</code>, and
+        bring over the desktop's <code>settings.txt</code>: all 67 Yixin-Board
+        settings are here.
+      </p>
+    </td>
+  </tr>
+</table>
+
+---
+
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/download-dark.svg"><img src="docs/readme/sections/download-light.svg" height="32" align="top" alt=""></picture> Download
 
 Get the APK from the [latest release](https://github.com/lowqen/Zenyth/releases/latest).
-Android will ask once for permission to install from an unknown source.
+For update notifications without a store, add this repository's URL to
+[Obtainium](https://github.com/ImranR98/Obtainium).
 
-For update notifications without a store, install
-[Obtainium](https://github.com/ImranR98/Obtainium) and add this repository URL.
-New releases then arrive as a notification and update with one tap.
+| Needs | |
+|---|---|
+| Android | 8.0 (API 26) or newer |
+| CPU | **arm64**. Older armeabi and x86 devices cannot run the engine. |
+| Storage | about 90 MB. The networks ship inside the APK, so nothing downloads on first run. |
 
-**Requirements**
-
-* Android 8.0 (API 26) or newer
-* An **arm64** device. Older armeabi and x86 devices cannot run the engine.
-* About 90 MB of storage. The neural network weights ship inside the APK, so
-  nothing is downloaded on first run.
-
-The interface is available in English, Korean and Simplified Chinese (简体中文).
-
-### Verify your download
+<details>
+<summary><b>Verify your download</b></summary>
+<br>
 
 Every release APK is signed with the same key. Its certificate SHA-256 is
 
@@ -56,156 +214,104 @@ Every release APK is signed with the same key. Its certificate SHA-256 is
 F8:30:FF:50:9B:96:CB:A8:01:3E:B0:0D:1B:DB:C2:F4:FE:EF:41:C9:35:03:D5:06:B3:C9:DA:65:22:A9:B9:2E
 ```
 
-An APK signed with anything else did not come from this project, whatever its
-name says. Three ways to check, from easiest:
+An APK signed with anything else did not come from this project, whatever its name says.
 
-* **On the phone**: [AppVerifier](https://github.com/soupslurpr/AppVerifier).
-  Share the installed app to it, or paste this:
-  `dev.gomoku.rapfidroid` followed by the fingerprint above on the next line.
-* **With the Android SDK**: `apksigner verify --print-certs Zenyth-x.y.z.apk`
-  prints `certificate SHA-256 digest: f830ff50…b92e`.
-* **Where it was built**: `gh attestation verify Zenyth-x.y.z.apk -R lowqen/Zenyth`
-  checks a signed build provenance record that says which commit and workflow
-  produced the file (releases after v0.16.0).
+* **On the phone**: [AppVerifier](https://github.com/soupslurpr/AppVerifier). Share the installed
+  app to it, or paste `dev.gomoku.rapfidroid` followed by the fingerprint above on the next line.
+* **With the Android SDK**: `apksigner verify --print-certs Zenyth-x.y.z.apk` prints
+  `certificate SHA-256 digest: f830ff50…b92e`.
+* **Where it was built**: `gh attestation verify Zenyth-x.y.z.apk -R lowqen/Zenyth` checks a signed
+  provenance record of the commit and workflow that produced the file (releases after v0.16.0).
 
-Android itself refuses an update signed with a different key, so this matters
-most for the first install. F-Droid builds are signed by F-Droid's key and
-will not match.
+Android refuses an update signed with a different key, so this matters most for the first install.
+F-Droid builds are signed with F-Droid's key and will not match.
 
-## Features
+</details>
 
-### Play and analyse
+---
 
-* The engine starts with the app, and the board has two tabs, **Analysis** and
-  **Play**, each with its own board, so lines explored in analysis never leak
-  into the game record. Both boards are saved automatically.
-* Analysis: best move, win rate, eval and depth (details on demand); the last
-  result stays after a stop; analysis time, candidates and "play the best move
-  on stop" sit in a folded settings card.
-* Play: colours, time control (presets or typed), five strength levels by nodes,
-  rules; "Move now" when the engine thinks without a limit.
-* Board values written as text only (blue, green, red) and a vertical eval bar.
-* A position card with the opening name chain and fifth-move grade, the move's
-  grade, database value and note, and a Game menu (open, save .psq/.sav, copy a
-  Zenyth Web link, image).
-* Renju forbidden points marked as you play, with the double three, double four
-  and overline rules applied by the engine itself rather than approximated.
-* Freestyle, standard and renju rules, each with its own network.
-* A board value overlay that colours every legal point by the engine's judgement.
-* Board image export, position copy and paste in the desktop text format, undo,
-  redo and branch navigation.
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/engine-dark.svg"><img src="docs/readme/sections/engine-light.svg" height="32" align="top" alt=""></picture> How it runs on a phone
 
-### Study
+Since Android 10 an app may only execute a file that the package manager extracted
+into its native library directory, and only if it is named `lib*.so`. So the engine is
+built as an ordinary position-independent executable named `libengine.so` and started
+as a **separate process**, speaking the same piskvork protocol over stdin and stdout
+that the desktop does. The interface follows the desktop
+[Yixin-Board](https://github.com/dhbloo/Yixin-Board) study environment, so the full set
+of engine parameters came across rather than a mobile subset.
 
-* **Game review.** Walk a finished game move by move with the engine marking
-  where the evaluation actually turned.
-* **Opening explorer.** A playable board with every graded next move drawn as its
-  shape and played ones as their game count; 249 named openings across the first
-  four moves, an eleven grade evaluation of Black's fifth move covering 1,889
-  shapes, and the transpositions that reduce to the same position.
-* **Rankings.** The 26 classical openings with direct and indirect filters, plus
-  fifth move shape frequency.
-* **Position proving.** Ask the engine to prove a position rather than only
-  evaluate it, with a depth budget you control.
-* **Move sequence explorer** and an engine console for raw protocol commands.
+<details>
+<summary><b>Why a process and not JNI?</b></summary>
+<br>
 
-### Joseki
-
-* **Official curriculum.** Courses of lessons, each with Browse (tree,
-  commentary, good and bad moves, traps and refutations) and Learn (play the
-  moves yourself, with hints, a score and progress). It is the file Zenyth Web
-  publishes, fetched from the site so new lessons arrive without an app update,
-  and lesson links (`rapfiweb.pages.dev/joseki?lesson=…`) open in the app.
-* **My joseki.** Add moves on the board or as `h8 i9 j10`, with branches,
-  evaluation symbols and markdown notes, and find them again from the board's
-  position, symmetries included. Same JSON as Zenyth Web.
-
-### Keep what it learns
-
-* The engine writes what it learns to a database file on your phone and picks it
-  up again next time. The app sends the save command before shutting the engine
-  down, so a session is never lost to a forced kill.
-* Import and export game records, and the same `settings.txt` and
-  `settings_dev.txt` files the desktop uses.
-
-## How the engine runs on your phone
-
-This is the part that is not obvious, so it is worth stating plainly.
-
-Since Android 10 an app may only execute a file from the directory the package
-manager extracted its native libraries into, and only if that file is named
-`lib*.so`. So the engine is built as an ordinary position independent executable
-named `libengine.so`, packaged with legacy jniLibs packaging so the package
-manager really does extract it, and started as a **separate process** over stdin
-and stdout using the same piskvork protocol the desktop speaks.
-
-A separate process rather than JNI, for four reasons that all bite in practice:
-
-1. Rapfi calls `exit` when it cannot allocate its transposition table. Inside the
-   app process that is a crash with no stack trace.
-2. The engine changes its working directory. A library that does this to its host
-   breaks unrelated code.
+1. Rapfi calls `exit` when it cannot allocate its transposition table. Inside the app process that is a crash with no stack trace.
+2. The engine changes its working directory. A library that does this to its host breaks unrelated code.
 3. A search must be cancellable without unwinding the app.
-4. It keeps a clean boundary between GPL-3.0 code and this BSD-2-Clause app.
+4. It keeps a clean boundary between GPL-3.0 code and the BSD-2-Clause app.
 
-The build is verified rather than assumed. Rapfi's search result is independent
-of the instruction set it was compiled for, because upstream compiles with
-`-ffp-contract=off`, so the `BENCH` command must print the same hash `e240ab16`
-on the phone as on an x86 host. The build script refuses to emit a binary that is
-not aarch64, that depends on `libc++_shared`, or that lost any of those flags.
-See [tools/build_engine_android.sh](tools/build_engine_android.sh).
+</details>
 
-## Real game statistics
+<details>
+<summary><b>How do you know the phone build is right?</b></summary>
+<br>
 
-The opening explorer and rankings show win rates from real tournament play once a
-game database is present. That database is
-[RenjuNet](https://www.renju.net/game/), and its licence permits offline personal
-use while forbidding its contents, **or anything derived from them**, in any
-website or online system.
+Rapfi's search does not depend on the instruction set it was compiled for (upstream builds
+with `-ffp-contract=off`), so the `BENCH` command must print the same hash `e240ab16` on the
+phone as on an x86 host. The [build script](tools/build_engine_android.sh) refuses to emit a
+binary that is not aarch64, that depends on `libc++_shared`, or that lost those flags. CI
+rebuilds the engine from source and checks it against the committed binary.
 
-So the data is not bundled, is not hosted, and is not fetched. Instead the app
-carries the whole conversion pipeline and builds the packs on the device:
+</details>
 
-> Settings ▸ **Add game data** ▸ open renju.net ▸ pick the XML file you
-> downloaded ▸ Build
+---
 
-You download the file yourself from the official source, your phone converts it,
-and the result never leaves the device. That is the one path the licence allows,
-and it is why there is no download button that does it for you.
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/faq-dark.svg"><img src="docs/readme/sections/faq-light.svg" height="32" align="top" alt=""></picture> FAQ
 
-The conversion is Zenyth Web's fast path. The 43 MB XML is streamed as bytes into
-integer columns, every prefix position is counted by a **64-bit incremental
-Zobrist canonical hash** (one XOR per symmetry per move), and one radix sort
-produces the statistics. What used to take minutes with two passes over string
-keys takes seconds, and the result is a single pack file. Tests check that equal
-hashes mean equal canonical keys over random positions and all symmetries.
+<details>
+<summary><b>Where do the opening win rates come from?</b></summary>
+<br>
 
-## Server mode
+From [RenjuNet](https://www.renju.net/game/)'s game database, but only once you add it. Its
+licence permits offline personal use and forbids its contents, **or anything derived from
+them**, in any website or online system. So the data is not bundled, hosted or fetched;
+the app carries the conversion pipeline and builds the statistics on the device:
 
-The original architecture talked to Rapfi on a PC over the network, and that mode
-is still here for the cases where a phone genuinely cannot compete: a very large
-opening database, or an analysis you want to leave running for hours.
+> Settings ▸ **Add game data** ▸ open renju.net ▸ pick the XML file you downloaded ▸ Build
 
-It is **off by default and hidden behind an advanced switch.** Apart from the
-curriculum file below, nothing in this app contacts the network unless you turn
-it on and enter an address yourself.
+The 43 MB XML is streamed into integer columns, every prefix position is counted by a
+64-bit incremental Zobrist canonical hash, and one radix sort produces the pack. It takes
+seconds, and the result never leaves your phone.
 
-### Keep the server link private
+</details>
 
-The link is plain TCP speaking piskvork, which has no encryption or password of
-its own; Zenyth expects it to run inside [Tailscale](https://tailscale.com),
-whose WireGuard tunnel encrypts it, and warns when the address you type is
-neither a Tailscale nor a private-network one. On the server side:
+<details>
+<summary><b>Does the app use the network?</b></summary>
+<br>
 
-* **Listen on the tailnet only.** `ss -ltnp | grep 5050` should show the
-  machine's `100.x.y.z:5050`, not `0.0.0.0:5050` or `*:5050`. Listening on
-  everything puts an engine anyone can drive on every network that machine is
-  on, the internet included if it has a public address.
-* **Let only your devices in.** Tailscale's default policy lets every device on
-  the tailnet reach every port. Tag the server and allow port 5050 from your
-  own login only. A rule like this restricts nothing while the default
-  allow-everything rule is still in the policy, so replace that rule with ones
-  for what you actually use:
+Once, and you can turn it off. The Joseki tab fetches the official curriculum from
+`https://rapfiweb.pages.dev/joseki/curriculum.json`, the static file Zenyth Web serves.
+Nothing about you, your games or your device is sent, and an unchanged file costs an empty
+reply. **Settings ▸ Update the joseki curriculum** turns it off. Everything else works in
+airplane mode.
+
+</details>
+
+<details>
+<summary><b>Can the engine run on my PC instead?</b></summary>
+<br>
+
+Yes. Server mode talks to Rapfi on another machine, for a very large opening database or
+an analysis you want to leave running for hours. It is **off by default** behind an
+advanced switch.
+
+The link is plain TCP speaking piskvork, with no encryption or password of its own, so
+Zenyth expects it to run inside [Tailscale](https://tailscale.com) and warns when an
+address is neither a Tailscale nor a private-network one. On the server:
+
+* **Listen on the tailnet only.** `ss -ltnp | grep 5050` should show `100.x.y.z:5050`,
+  not `0.0.0.0:5050` or `*:5050`.
+* **Let only your devices in.** Tailscale's default policy lets every device reach every
+  port. Replace the allow-everything rule with ones like this:
 
   ```json
   "tagOwners": { "tag:rapfi-server": ["autogroup:admin"] },
@@ -214,18 +320,42 @@ neither a Tailscale nor a private-network one. On the server side:
   ]
   ```
 
-### The one automatic request
+</details>
 
-The Joseki tab fetches the official curriculum from
-`https://rapfiweb.pages.dev/joseki/curriculum.json`, the same file the Zenyth Web
-site serves, so new lessons arrive without an app update. It is a plain request
-for a static file; nothing about you, your games or your device is sent, and an
-unchanged file costs an empty reply. **Settings ▸ Update the joseki curriculum**
-turns it off; the refresh button and lesson links still fetch when you tap
-them. Everything else, the curriculum already on the phone included, works in
-airplane mode.
+<details>
+<summary><b>Why arm64 only?</b></summary>
+<br>
 
-## Building from source
+The engine is native code built and verified for arm64-v8a, the CPU of practically every
+Android phone of recent years. It picks the faster dot-product build at run time when the CPU has
+it and falls back to plain NEON when it does not.
+
+</details>
+
+<details>
+<summary><b>Why isn't it on Google Play?</b></summary>
+<br>
+
+The APK contains Rapfi, which is GPL-3.0. GPL-3.0 sections 6 and 10 conflict with the Play
+distribution terms, so it cannot be published there. That is a consequence of the licence,
+not a choice. GitHub Releases, Obtainium and F-Droid are the GPL's natural homes; the
+F-Droid recipe lives in [`fdroid/`](fdroid/).
+
+</details>
+
+<details>
+<summary><b>Is this the official Rapfi app?</b></summary>
+<br>
+
+No. Zenyth is an unofficial port. Rapfi is by [dhbloo](https://github.com/dhbloo); this
+project packages it for Android and builds a study interface around it. It was formerly
+called RapfiDroid.
+
+</details>
+
+---
+
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/development-dark.svg"><img src="docs/readme/sections/development-light.svg" height="32" align="top" alt=""></picture> Development
 
 ```bash
 git clone https://github.com/lowqen/Zenyth.git
@@ -233,68 +363,59 @@ cd Zenyth
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-Android Studio Ladybug or newer, JDK 17, compileSdk 35. The repository carries a
-prebuilt `libengine.so` so a fresh clone builds and runs immediately. To rebuild
-the engine yourself, [tools/build_engine_android.sh](tools/build_engine_android.sh)
-does everything from installing the NDK to verifying the resulting binary, and
-[app/src/main/jniLibs/ENGINE_VERSION.txt](app/src/main/jniLibs/ENGINE_VERSION.txt)
-records exactly which engine commit the committed binary came from.
-
-Unit tests run on every push. They cover the engine grammar, the position keys,
-the pack readers and writers, the settings codec and the opening tables, and they
-are the reason a refactor of the canonical key is safe to make at all.
-
-### Layout
+JDK 17 and a current Android Studio (AGP 9.5, compileSdk 37). A prebuilt `libengine.so` is
+committed so a fresh clone builds immediately; [`tools/build_engine_android.sh`](tools/build_engine_android.sh)
+rebuilds and verifies it, and [`ENGINE_VERSION.txt`](app/src/main/jniLibs/ENGINE_VERSION.txt)
+records the exact engine commit. Unit tests and screenshot goldens run on every push.
 
 ```
 app/src/main/java/dev/gomoku/zenyth/
-  core/         board model, position keys, settings table, design system
-  data/         engine transports, stores, pack and database IO
-  domain/       engine session, RIF parsing, aggregation, pack writing
-  feature/      board, research, database, connection, settings, onboarding
-tools/          engine cross compilation and verification
-fdroid/         F-Droid metadata and build recipe
-docs/           publishing, licence notes, release notes
+  core/      board model, position keys, settings table, design system
+  data/      engine transports, stores, pack and database IO
+  domain/    engine session, RIF parsing, aggregation, pack writing
+  feature/   board, research, joseki, connection, settings, onboarding
+tools/       engine cross-compilation, patches, PGO profile
+fdroid/      F-Droid metadata and build recipe
+docs/        publishing, engineering notes, release notes
 ```
 
-## Releasing
+Releases are one pushed tag; CI refuses any build that contains RenjuNet-derived data or
+an engine Android cannot execute. See [docs/publishing.md](docs/publishing.md). Design
+decisions and measurements are in [docs/engineering-notes.md](docs/engineering-notes.md).
+Security reports: [SECURITY.md](SECURITY.md).
 
-Push a tag and CI does the rest, including two gates that fail the release rather
-than let a bad APK out: one that refuses any build containing RenjuNet derived
-data, and one that checks the engine is present and packaged so Android can
-actually execute it. See [docs/publishing.md](docs/publishing.md).
+---
 
-## Licence
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/credits-dark.svg"><img src="docs/readme/sections/credits-light.svg" height="32" align="top" alt=""></picture> Credits
 
-Zenyth's own source is **BSD-2-Clause**. The distributed APK also contains
-the Rapfi engine, which is **GPL-3.0-or-later**, so the package as a whole is
-conveyed under GPL-3.0-or-later.
+<p align="center">
+  <a href="https://github.com/dhbloo/rapfi"><b>Rapfi</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/dhbloo/rapfi-networks"><b>rapfi-networks</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/dhbloo/Yixin-Board"><b>Yixin-Board</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/accreator/Yixin-Board"><b>Yixin-Board (Kai Sun)</b></a> &nbsp;·&nbsp;
+  <a href="https://www.renju.net/"><b>RenjuNet</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/orioncactus/pretendard"><b>Pretendard</b></a>
+</p>
 
-The corresponding source for the engine in the released APK is
-**https://github.com/lowqen/rapfi**, branch `android` — for each release the
-tag `zenyth-v<version>` (0.16.0: upstream `3c94c2a9`, two blocks in
-`Rapfi/CMakeLists.txt` for the Android build, and result-invariant patches (speed,
-no weight reload on a thread change), one commit each; `android/` holds the build options and the PGO
-profile of the dotprod build).
+[dhbloo](https://github.com/dhbloo) wrote Rapfi, the engine that makes this worth using, and
+the Yixin-Board fork this interface follows. Kai Sun wrote the original Yixin-Board
+(BSD-2-Clause, 2009 to 2017). The network weights are CC0 1.0. No permission was required
+from any of them and none was sought: what their licences ask for is notice and source, and
+both are given here.
 
-Full third party notices are in [LICENSES.md](LICENSES.md), and the GPL-3.0 and
-BSD-2-Clause texts ship inside the app under Settings ▸ About ▸ Licences.
+---
 
-This app cannot be published on Google Play. That is a consequence of GPL-3.0
-section 6 and section 10 against the Play distribution terms, not a choice.
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/sections/licence-dark.svg"><img src="docs/readme/sections/licence-light.svg" height="32" align="top" alt=""></picture> Licence
 
-## Credits
+Zenyth's own source is **BSD-2-Clause**. The distributed APK also contains the Rapfi engine,
+which is **GPL-3.0-or-later**, so the package as a whole is conveyed under GPL-3.0-or-later.
 
-* **[dhbloo](https://github.com/dhbloo)** for [Rapfi](https://github.com/dhbloo/rapfi),
-  the engine that makes this worth using, and for the
-  [Yixin-Board](https://github.com/dhbloo/Yixin-Board) fork this interface follows.
-* **Kai Sun** for the original
-  [Yixin-Board](https://github.com/accreator/Yixin-Board), BSD-2-Clause,
-  copyright 2009 to 2017.
-* **[rapfi-networks](https://github.com/dhbloo/rapfi-networks)** for the neural
-  network weights, CC0 1.0.
-* **[RenjuNet](https://www.renju.net/)** for the game database that users build
-  their own statistics from.
+The corresponding source for the engine in each release is
+**[lowqen/rapfi](https://github.com/lowqen/rapfi)**, branch `android`, tag `zenyth-v<version>`:
+upstream `3c94c2a9`, two blocks in `Rapfi/CMakeLists.txt` for the Android build, and
+result-invariant speed patches, one commit each. Full third-party notices are in
+[LICENSES.md](LICENSES.md); the GPL-3.0 and BSD-2-Clause texts ship inside the app under
+Settings ▸ About ▸ Licences.
 
-No permission was required from any of them, and none was sought. What their
-licences ask for is notice and source, and both are given above.
+> [!TIP]
+> **Star the repo** to get notified about new releases directly from GitHub.
