@@ -32,12 +32,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Zenyth Web position links (…/board?p=h8i9j10). Not auto-verified:
-                 the user can choose this app for them in the system settings. -->
+            <!-- Zenyth Web position and lesson links (…/board?p=h8i9j10, …/joseki?lesson=…).
+                 Not auto-verified: the user can choose this app for them in the system settings.
+                 The site moved to zenythweb.pages.dev on 2026-11-02; the old host stays for the
+                 links already shared (it only redirects now). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="zenythweb.pages.dev" />
                 <data android:scheme="https" android:host="rapfiweb.pages.dev" />
             </intent-filter>
         </activity>

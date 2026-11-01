@@ -7,10 +7,10 @@ class LessonLinkTest {
     @Test
     fun `writes the addresses Zenyth Web writes`() {
         assertThat(LessonLink.url("first-three-moves", learn = false))
-            .isEqualTo("https://rapfiweb.pages.dev/joseki?lesson=first-three-moves")
+            .isEqualTo("https://zenythweb.pages.dev/joseki?lesson=first-three-moves")
         assertThat(LessonLink.url("a-b", learn = true))
-            .isEqualTo("https://rapfiweb.pages.dev/joseki?lesson=a-b&mode=learn")
-        assertThat(LessonLink.CURRICULUM_URL).isEqualTo("https://rapfiweb.pages.dev/joseki/curriculum.json")
+            .isEqualTo("https://zenythweb.pages.dev/joseki?lesson=a-b&mode=learn")
+        assertThat(LessonLink.CURRICULUM_URL).isEqualTo("https://zenythweb.pages.dev/joseki/curriculum.json")
     }
 
     @Test
@@ -21,6 +21,10 @@ class LessonLinkTest {
             .isEqualTo(LessonTarget("a-b", null, learn = true))
         assertThat(LessonLink.parse("https://rapfiweb.pages.dev/joseki?course=renju-opening-basics"))
             .isEqualTo(LessonTarget(null, "renju-opening-basics", learn = false))
+        // The site moved to zenythweb.pages.dev (2026-11-02); links shared before
+        // that still carry the old host and must still open — the host is not read.
+        assertThat(LessonLink.parse("https://zenythweb.pages.dev/joseki?lesson=first-three-moves&mode=learn"))
+            .isEqualTo(LessonTarget("first-three-moves", null, learn = true))
         // A round trip through what the app itself copies.
         assertThat(LessonLink.parse(LessonLink.url("x-1", learn = true))).isEqualTo(LessonTarget("x-1", null, true))
     }

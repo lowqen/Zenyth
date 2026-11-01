@@ -11,7 +11,7 @@ class PositionLinkTest {
     @Test
     fun `encodes lower case with no separator`() {
         assertThat(PositionLink.encode(listOf(h8, i9, j10), 15)).isEqualTo("h8i9j10")
-        assertThat(PositionLink.url(listOf(h8), 15)).isEqualTo("https://rapfiweb.pages.dev/board?p=h8")
+        assertThat(PositionLink.url(listOf(h8), 15)).isEqualTo("https://zenythweb.pages.dev/board?p=h8")
     }
 
     @Test

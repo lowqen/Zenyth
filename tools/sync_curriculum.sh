@@ -2,7 +2,7 @@
 # Refreshes the APK's copy of the official joseki curriculum from Zenyth Web.
 #
 # The app reads the published file at run time
-# (https://rapfiweb.pages.dev/joseki/curriculum.json, JosekiRepository); the
+# (https://zenythweb.pages.dev/joseki/curriculum.json, JosekiRepository); the
 # copy in assets is only what a fresh install shows before its first fetch, or
 # offline. Run this before a release so that copy is the current one:
 #
@@ -15,7 +15,7 @@ set -euo pipefail
 
 here="$(cd "$(dirname "$0")/.." && pwd)"
 dest="$here/app/src/main/assets/joseki/curriculum.json"
-url="https://rapfiweb.pages.dev/joseki/curriculum.json"
+url="https://zenythweb.pages.dev/joseki/curriculum.json"
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT

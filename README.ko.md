@@ -36,7 +36,7 @@
 </p>
 
 <p align="center">
-  <a href="https://rapfiweb.pages.dev">
+  <a href="https://zenythweb.pages.dev">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/web-dark.svg">
       <img alt="브라우저에서 쓰는 Zenyth Web" src="docs/readme/badges/web-light.svg" height="56">
@@ -278,7 +278,7 @@ Rapfi 의 탐색 결과는 컴파일한 명령어 집합과 무관합니다(upst
 <br>
 
 한 번, 그리고 끌 수 있습니다. 정석 탭이 Zenyth Web 이 싣는 정적 파일
-`https://rapfiweb.pages.dev/joseki/curriculum.json` 에서 공식 커리큘럼을 받아 옵니다. 사용자 · 기보 ·
+`https://zenythweb.pages.dev/joseki/curriculum.json` 에서 공식 커리큘럼을 받아 옵니다. 사용자 · 기보 ·
 기기에 관한 것은 아무것도 보내지 않고, 바뀌지 않은 파일은 빈 응답으로 끝납니다.
 **설정 ▸ 정석 커리큘럼 자동 업데이트** 로 끕니다. 그 밖의 모든 것은 비행기 모드에서 동작합니다.
 

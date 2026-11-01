@@ -52,7 +52,7 @@ data class JosekiHit(val tree: JosekiTree, val path: List<Int>, val ply: Int)
  * so it moves between the two apps as is).
  *
  * **The curriculum is Zenyth Web's.** The maintainer publishes one file,
- * `https://rapfiweb.pages.dev/joseki/curriculum.json` (Zenyth Web
+ * `https://zenythweb.pages.dev/joseki/curriculum.json` (Zenyth Web
  * `docs/공식-정석-관리.md`), and this app reads that same file: on start it shows
  * the last copy it fetched (`files/curriculum.json`) or, before the first
  * fetch, the one in the APK's assets, then asks the site for a newer one. The

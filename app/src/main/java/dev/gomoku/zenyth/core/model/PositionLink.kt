@@ -1,7 +1,8 @@
 package dev.gomoku.zenyth.core.model
 
 /**
- * The position link Zenyth Web shares: `https://rapfiweb.pages.dev/board?p=h8i9j10`.
+ * The position link Zenyth Web shares: `https://zenythweb.pages.dev/board?p=h8i9j10`
+ * (`rapfiweb.pages.dev` until 2026-11-02 — it redirects, and links are read by their query).
  *
  * Coordinates run together with no separator — the column letter is the
  * separator — lower case when written, any case, spaces or commas when read,
@@ -10,7 +11,7 @@ package dev.gomoku.zenyth.core.model
  * the whole link, since half a position is not the position that was sent.
  */
 object PositionLink {
-    const val BASE = "https://rapfiweb.pages.dev/board"
+    const val BASE = "https://zenythweb.pages.dev/board"
     const val PARAM = "p"
 
     private val SHAPE = Regex("^([A-Za-z]\\d{1,2})*$")

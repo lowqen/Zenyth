@@ -27,7 +27,8 @@ public, so there is little on the phone to steal. What matters:
   key, or a release published, without the maintainer: the signing key, this
   repository's settings and its GitHub Actions workflows.
 * **Input from outside.** Links any web page or app can open the app with
-  (`rapfiweb.pages.dev/board?p=…`, `…/joseki?lesson=…`), files you open (game
+  (`zenythweb.pages.dev/board?p=…`, `…/joseki?lesson=…`, and the same on the old
+  `rapfiweb.pages.dev`), files you open (game
   records, settings, joseki JSON, `.rif`), the joseki curriculum fetched from
   Zenyth Web, and the replies of a server engine. A crash from any of these is
   a bug worth reporting; anything more is a vulnerability.

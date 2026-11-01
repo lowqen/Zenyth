@@ -36,7 +36,7 @@
 </p>
 
 <p align="center">
-  <a href="https://rapfiweb.pages.dev">
+  <a href="https://zenythweb.pages.dev">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/readme/badges/web-dark.svg">
       <img alt="Zenyth Web, in the browser" src="docs/readme/badges/web-light.svg" height="56">
@@ -289,7 +289,7 @@ seconds, and the result never leaves your phone.
 <br>
 
 Once, and you can turn it off. The Joseki tab fetches the official curriculum from
-`https://rapfiweb.pages.dev/joseki/curriculum.json`, the static file Zenyth Web serves.
+`https://zenythweb.pages.dev/joseki/curriculum.json`, the static file Zenyth Web serves.
 Nothing about you, your games or your device is sent, and an unchanged file costs an empty
 reply. **Settings ▸ Update the joseki curriculum** turns it off. Everything else works in
 airplane mode.

@@ -368,7 +368,7 @@ private fun SectionsBuilder.dataSections(actions: SettingsActions, prefs: UiPref
             row {
                 SwitchRow(
                     tr("정석 커리큘럼 자동 업데이트", "Update the joseki curriculum", "自动更新定式课程"),
-                    tr("rapfiweb.pages.dev · 보내는 정보 없음", "rapfiweb.pages.dev · nothing is sent", "rapfiweb.pages.dev · 不发送任何信息"),
+                    tr("zenythweb.pages.dev · 보내는 정보 없음", "zenythweb.pages.dev · nothing is sent", "zenythweb.pages.dev · 不发送任何信息"),
                     curriculum,
                 ) { prefs.curriculumAutoUpdate.set(it) }
             }

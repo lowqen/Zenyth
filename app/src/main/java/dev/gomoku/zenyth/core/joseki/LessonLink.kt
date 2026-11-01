@@ -9,13 +9,15 @@ data class LessonTarget(val lessonId: String?, val courseId: String?, val learn:
 
 /**
  * Zenyth Web's curriculum links (`core/curriculum/link.ts`):
- * `https://rapfiweb.pages.dev/joseki?lesson=<id>` (`&mode=learn` to open in
+ * `https://zenythweb.pages.dev/joseki?lesson=<id>` (`&mode=learn` to open in
  * learn mode) and `…/joseki?course=<id>`. The app writes the same addresses,
  * so a lesson shared from the phone opens on the web and the other way round,
- * and the published curriculum both read lives at the same site.
+ * and the published curriculum both read lives at the same site. The site was
+ * `rapfiweb.pages.dev` until 2026-11-02; that host now redirects every path
+ * here, and [parse] never looked at the host, so old links still open.
  */
 object LessonLink {
-    const val SITE = "https://rapfiweb.pages.dev"
+    const val SITE = "https://zenythweb.pages.dev"
 
     /** The published curriculum — the file the web app serves and the app syncs. */
     const val CURRICULUM_URL = "$SITE/joseki/curriculum.json"
