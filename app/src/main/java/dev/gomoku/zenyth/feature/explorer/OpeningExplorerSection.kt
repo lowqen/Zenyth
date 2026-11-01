@@ -223,8 +223,9 @@ fun OpeningExplorerSection(
 }
 
 /**
- * The explorer's own board: the line on the board, every graded next move as
- * its shape and every played one as its game count. Tap a point to play it;
+ * The explorer's own board: the line on the board, every played next move as
+ * its game count and every graded one as its shape ([explorerBoardMarks]).
+ * Tap any point to play it — a move with no games is still worth exploring;
  * the arrows step through the line.
  */
 @Composable
@@ -233,17 +234,15 @@ private fun ExplorerBoard(
     viewModel: OpeningExplorerViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val next = ui.position?.next.orEmpty()
-    val grades = next.mapNotNull { r -> r.grade?.let { r.move to it } }.toMap()
-    val counts = next.filter { it.games > 0 && it.move !in grades }.take(12).associate {
-        it.move to dev.gomoku.zenyth.core.designsystem.component.BoardMark("${it.games}", dev.gomoku.zenyth.core.designsystem.component.BoardMarkColors.Plain)
+    val render = remember(ui.position, ui.stones) {
+        val marks = explorerBoardMarks(ui.position?.next.orEmpty(), blackToMove = ui.stones.size % 2 == 0)
+        dev.gomoku.zenyth.core.designsystem.component.BoardRender(
+            stones = ui.stones,
+            lastMove = ui.stones.lastOrNull(),
+            tags = marks.tags,
+            gradeMarks = marks.grades,
+        )
     }
-    val render = dev.gomoku.zenyth.core.designsystem.component.BoardRender(
-        stones = ui.stones,
-        lastMove = ui.stones.lastOrNull(),
-        gradeMarks = grades,
-        marks = counts,
-    )
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         dev.gomoku.zenyth.core.designsystem.component.GomokuBoard(
             render = render,

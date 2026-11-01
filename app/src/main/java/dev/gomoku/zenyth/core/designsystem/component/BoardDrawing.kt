@@ -182,8 +182,12 @@ fun DrawScope.drawBoard(
         drawStone(cx(m.x), cy(m.y), radius, black, number, 0.4f, skin, hair, paints.stoneNumber)
     }
 
+    // A grade alone takes the point; a grade sharing it with a value (the opening
+    // explorer's game count) goes small in its top-right corner, drawn after the
+    // values below — Zenyth Web's renderer, where a count used to hide the shape.
+    fun sharesPoint(m: Move) = render.tags[m]?.label?.isNotEmpty() == true
     render.gradeMarks.forEach { (m, grade) ->
-        if (m !in occupiedCells) drawGradeMark(grade, Offset(cx(m.x), cy(m.y)), radius * 0.5f)
+        if (m !in occupiedCells && !sharesPoint(m)) drawGradeMark(grade, Offset(cx(m.x), cy(m.y)), radius * 0.5f)
     }
 
     // Values as text, above the ghosts: since the chip went, a translucent
@@ -196,6 +200,11 @@ fun DrawScope.drawBoard(
                 cx(m.x), cy(m.y), geometry, tag.label, render.palette.textFor(tag), textScale, paints,
                 bold = tag.kind != TagKind.RATE,
             )
+        }
+    }
+    render.gradeMarks.forEach { (m, grade) ->
+        if (m !in occupiedCells && sharesPoint(m)) {
+            drawGradeMark(grade, Offset(cx(m.x) + radius * 0.62f, cy(m.y) - radius * 0.62f), radius * 0.28f)
         }
     }
     // database values and board texts, never over an analysis tag for the same point
