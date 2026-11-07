@@ -60,6 +60,8 @@ class DatabaseRepositoryTest {
         val sent = mutableListOf<String>()
         val responseFlow = MutableSharedFlow<EngineResponse>(extraBufferCapacity = 64)
         val stateFlow = MutableStateFlow<ConnectionState>(ConnectionState.Ready)
+        var local = false
+        override val savesDuringSearch: Boolean get() = local
 
         override val state: StateFlow<ConnectionState> get() = stateFlow
         override val responses: SharedFlow<EngineResponse> get() = responseFlow
@@ -506,6 +508,44 @@ class DatabaseRepositoryTest {
 
         h.busy.release(EngineBusy.PROVE)
         assertEquals(DbOpResult.Sent, h.repository.save())
+    }
+
+    /**
+     * The on-device engine carries DB1 · DB4: a save writes `<file>.tmp` beside
+     * the search and swaps it in, so neither waits for the other — a save during
+     * an analysis or a proof goes out.
+     */
+    @Test
+    fun `the on-device engine saves during a search`() = dbTest { h ->
+        h.engine.local = true
+        runCurrent()
+        emit(h, "MESSAGE DATABASE LOAD START rapfi.db")
+        emit(h, "MESSAGE DATABASE LOAD DONE")
+        runCurrent()
+        h.engine.stateFlow.value = ConnectionState.Thinking
+        h.busy.acquire(EngineBusy.PROVE)
+        runCurrent()
+        h.engine.sent.clear()
+
+        assertEquals(DbOpResult.Sent, h.repository.save())
+        runCurrent()
+        assertEquals(listOf("yxsavedatabase"), h.engine.sent)
+    }
+
+    /** …the server's upstream Rapfi still stops a search for a save, or drops it. */
+    @Test
+    fun `the server engine still waits for the search`() = dbTest { h ->
+        runCurrent()
+        emit(h, "MESSAGE DATABASE LOAD START rapfi.db")
+        emit(h, "MESSAGE DATABASE LOAD DONE")
+        runCurrent()
+        h.engine.stateFlow.value = ConnectionState.Thinking
+        runCurrent()
+        h.engine.sent.clear()
+
+        assertTrue(h.repository.save() is DbOpResult.Refused)
+        runCurrent()
+        assertTrue(h.engine.sent.isEmpty())
     }
 
     /** A new engine process holds nothing the old one told us about. */

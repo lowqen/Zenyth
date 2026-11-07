@@ -31,6 +31,15 @@ interface EngineRepository {
     /** Whether the link dropped and what the repository is doing about it. */
     val health: StateFlow<LinkHealth>
 
+    /**
+     * Whether `YXSAVEDATABASE` may go out while the engine searches. True only for
+     * the on-device engine, which carries the DB1 · DB4 patches (tools/patches/):
+     * the save writes `<file>.tmp` beside the search and swaps it in, so it neither
+     * stops the search nor waits for it. Upstream Rapfi — the server across
+     * Tailscale — stops the search for a save, or drops the command mid-search.
+     */
+    val savesDuringSearch: Boolean get() = false
+
     /** Open a session with [target] — the server across Tailscale, or this phone. */
     suspend fun connect(target: EngineTarget)
     suspend fun send(command: EngineCommand)

@@ -28,8 +28,13 @@ NETWORKS_COMMIT="e32ad77a5364363b3e3a02b3f9e8610ade19ea98"  # dhbloo/rapfi-netwo
 #   r4-p2-2-keep-evaluators-on-rebuild.patch : 스레드 수를 바꿔도 평가기를 넘겨 가중치를 다시 읽지 않는다 (Zenyth Web P2-2, 결과 불변)
 #   r4-p4-1-periodic-node-stats.patch : 탐색 중 0.5초마다 INFO TOTALNODES · TOTALTIME · SPEED (Zenyth Web P4-1, 출력만)
 #   k7-codebook-prefetch-early.patch : 코드북 행을 인덱스가 정해지는 즉시 프리페치 (결과 불변)
+#   db1-atomic-nonblocking-save.patch : DB 저장을 <path>.tmp + rename 으로(도중에 죽어도 본 파일 무사) · 저장이 탐색을
+#                                       멈추거나 명령을 막지 않는다 (Zenyth Web DB1, 탐색 결과 불변)
+#   db2-usedatabase-guard.patch : INFO USEDATABASE 1 이 이미 붙은 DB 를 다시 읽지 않는다 (Zenyth Web DB2)
+#   db4-async-save.patch : YXSAVEDATABASE 를 백그라운드 스레드에서 — 곧바로 돌아오고 끝나면 'Saved database file' (Zenyth Web DB4)
+#   (db3 빠른 LZ4 는 뺐다 — 파일이 79→110MB 로 커진다. docs: gomoku-dev test-yixin/docs/DB_IO_개선_계획.md)
 # 같은 사슬이 lowqen/rapfi 의 android 브랜치에 커밋 하나씩 있다(GPL 대응 소스 — docs/publishing.md §0).
-RAPFI_PATCHES="k1-neon-vqdmulh.patch k2-neon-starblock-multi.patch k3-a4-policy-cache.patch r4-p2-2-keep-evaluators-on-rebuild.patch r4-p4-1-periodic-node-stats.patch k7-codebook-prefetch-early.patch"
+RAPFI_PATCHES="k1-neon-vqdmulh.patch k2-neon-starblock-multi.patch k3-a4-policy-cache.patch r4-p2-2-keep-evaluators-on-rebuild.patch r4-p4-1-periodic-node-stats.patch k7-codebook-prefetch-early.patch db1-atomic-nonblocking-save.patch db2-usedatabase-guard.patch db4-async-save.patch"
 PATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/patches"
 
 # K6 PGO — tools/pgo/rapfi-<변형>.profdata 는 위 커밋 + 위 패치로 만든 계측 빌드를 갤럭시 A16 에서

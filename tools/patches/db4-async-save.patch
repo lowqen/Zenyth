@@ -1,0 +1,106 @@
+diff --git a/Rapfi/command/gomocup.cpp b/Rapfi/command/gomocup.cpp
+index e857f77..842ac16 100644
+--- a/Rapfi/command/gomocup.cpp
++++ b/Rapfi/command/gomocup.cpp
+@@ -42,6 +42,15 @@
+ #include <optional>
+ #include <sstream>
+ 
++// Saving a large database takes seconds. Native multi-threaded builds save on a
++// background thread so the protocol keeps answering meanwhile. Emscripten keeps
++// the synchronous save: an extra pthread there needs a free worker in the pool.
++#if defined(MULTI_THREADING) && !defined(__EMSCRIPTEN__)
++    #define ASYNC_DATABASE_SAVE
++    #include <future>
++    #include <system_error>
++#endif
++
+ #ifdef MULTI_THREADING
+     #include <mutex>
+     #include <thread>
+@@ -63,6 +72,46 @@ bool                          GUIMode   = false;
+ std::atomic_bool              thinking  = false;
+ std::optional<CandidateRange> candRange = std::nullopt;
+ 
++#ifdef ASYNC_DATABASE_SAVE
++std::future<void> pendingDatabaseSave;
++#endif
++
++/// Waits for a background database save to finish. Must be called before the
++/// storage is replaced or destroyed (USEDATABASE, YXSETDATABASE, END, EOF).
++void waitDatabaseSave()
++{
++#ifdef ASYNC_DATABASE_SAVE
++    if (pendingDatabaseSave.valid())
++        pendingDatabaseSave.get();
++#endif
++}
++
++/// YXSAVEDATABASE: prints "Saved database file using N ms." when done, as before.
++void startDatabaseSave()
++{
++    Database::DBStorage *storage = Search::Engine.dbStorage();
++    if (!storage)
++        return;
++
++    auto saveNow = [storage] {
++        auto startTime = now();
++        storage->flush();
++        MESSAGEL("Saved database file using " << (now() - startTime) << " ms.");
++    };
++
++    waitDatabaseSave();  // one save at a time; a second request saves again afterwards
++#ifdef ASYNC_DATABASE_SAVE
++    try {
++        pendingDatabaseSave = std::async(std::launch::async, saveNow);
++        return;
++    }
++    catch (const std::system_error &) {
++        // No thread available: fall through to a synchronous save.
++    }
++#endif
++    saveNow();
++}
++
+ void sendActionAndUpdateBoard(ActionType action, Pos bestMove)
+ {
+     if (action == ActionType::Move) {
+@@ -315,6 +364,7 @@ void getOption()
+     }
+     else if (token == "USEDATABASE") {
+         std::cin >> val;
++        waitDatabaseSave();
+         // A repeated "1" used to build a complete second copy of the database before
+         // releasing the first (the argument is evaluated before setupDatabase), which
+         // doubles peak memory. Reload explicitly with "0" then "1" instead.
+@@ -444,6 +494,7 @@ void setDatabase()
+ {
+     auto databasePath = readPathFromInput();
+     if (!databasePath.empty() && !Database::DatabaseCfg.type.empty()) {
++        waitDatabaseSave();
+         Database::DatabaseCfg.url     = databasePath.u8string();
+         auto newDatabaseStorage = Database::createDBStorage(Database::DatabaseCfg);
+         if (newDatabaseStorage)
+@@ -791,7 +842,7 @@ bool runProtocol()
+     // Stop the protocol loop when reaching EOF
+     // We do not stop thinking here, but let the outer loop to wait for its finish.
+     if (std::cin.eof())
+-        return true;
++        return waitDatabaseSave(), true;
+ 
+     // We assume the command is in uppercase, but also support lowercase
+     upperInplace(cmd);
+@@ -804,11 +855,11 @@ bool runProtocol()
+     };
+ 
+     // clang-format off
+-    if (cmd == "END")                          return Search::Engine.stopThinking(), true;
++    if (cmd == "END")                          return Search::Engine.stopThinking(), waitDatabaseSave(), true;
+     else if (cmd == "STOP" || cmd == "YXSTOP") return Search::Engine.stopThinking(), false;
+     // Saving only reads the storage (writes from search are queued meanwhile), so it
+     // neither stops nor waits for a running search or ponder.
+-    else if (cmd == "YXSAVEDATABASE")          { auto ctx = dbCommandContext(); saveDatabase(ctx); return false; }
++    else if (cmd == "YXSAVEDATABASE")          return startDatabaseSave(), false;
+     else if (thinking)                         return false;
+ 
+ #ifdef MULTI_THREADING

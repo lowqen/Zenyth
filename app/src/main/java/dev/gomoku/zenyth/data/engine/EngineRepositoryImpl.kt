@@ -88,6 +88,9 @@ class EngineRepositoryImpl @Inject constructor(
     @Volatile
     private var lastTarget: EngineTarget? = null
 
+    override val savesDuringSearch: Boolean
+        get() = lastTarget?.isLocal == true
+
     /**
      * Resource limits for the on-device engine, mirrored from [LocalEngineStore]
      * by the collector below. Its default has to be usable before that first

@@ -66,7 +66,8 @@ import javax.inject.Singleton
  *    a stale reply flips the mate parity;
  *  - **auto-save while idle**: the timer fires only with the database on,
  *    writable and the engine not searching (main.c `db_autosave_tick`), so a
- *    save never interrupts a search;
+ *    save never interrupts a search. The on-device engine is the exception: it
+ *    carries DB1 · DB4 and saves beside a search without stopping it;
  *  - **read-only**: every write path is refused client-side too, not just by
  *    the engine, so the UI can explain why nothing happened;
  *  - **destructive ops locked**: bulk deletes and split need an explicit opt-in
@@ -370,7 +371,9 @@ class DatabaseRepositoryImpl @Inject constructor(
      *
      * A save goes out only when: the database is in use, the user has not asked
      * for read-only (both in [guarded]), the engine finished reading the file,
-     * it is not searching, and no earlier save is still running.
+     * it is not searching — unless it is the on-device engine, which saves
+     * beside a search ([EngineRepository.savesDuringSearch]) — and no earlier
+     * save is still running.
      */
     override suspend fun save(): DbOpResult = save(attachIfMissing = true)
 
@@ -413,7 +416,9 @@ class DatabaseRepositoryImpl @Inject constructor(
             )
             LoadState.LOADED -> Unit
         }
-        if (engineBusy()) {
+        // The on-device engine saves beside a running search (DB1 · DB4); only an
+        // upstream engine — the server — still has to be left alone until it ends.
+        if (engineBusy() && !engine.savesDuringSearch) {
             return DbOpResult.Refused(
                 tr(
                     "엔진이 탐색 중입니다 — 끝난 뒤에 저장합니다",

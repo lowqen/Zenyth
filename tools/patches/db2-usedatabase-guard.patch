@@ -1,0 +1,20 @@
+diff --git a/Rapfi/command/gomocup.cpp b/Rapfi/command/gomocup.cpp
+index eeba9c8..e857f77 100644
+--- a/Rapfi/command/gomocup.cpp
++++ b/Rapfi/command/gomocup.cpp
+@@ -315,8 +315,13 @@ void getOption()
+     }
+     else if (token == "USEDATABASE") {
+         std::cin >> val;
+-        if (val == 1)
+-            Search::Engine.setupDatabase(Database::createDBStorage(Database::DatabaseCfg));
++        // A repeated "1" used to build a complete second copy of the database before
++        // releasing the first (the argument is evaluated before setupDatabase), which
++        // doubles peak memory. Reload explicitly with "0" then "1" instead.
++        if (val == 1) {
++            if (!Search::Engine.dbStorage())
++                Search::Engine.setupDatabase(Database::createDBStorage(Database::DatabaseCfg));
++        }
+         else
+             Search::Engine.setupDatabase(nullptr);
+     }
