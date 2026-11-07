@@ -1,0 +1,727 @@
+diff --git a/Rapfi/database/yxdbstorage.cpp b/Rapfi/database/yxdbstorage.cpp
+index 0d54724..8a8963b 100644
+--- a/Rapfi/database/yxdbstorage.cpp
++++ b/Rapfi/database/yxdbstorage.cpp
+@@ -24,6 +24,8 @@
+ #include "dbconfig.h"
+ #include "dbtypes.h"
+ 
++#include <algorithm>
++#include <cstdint>
+ #include <cstring>
+ #include <fstream>
+ #include <mutex>
+@@ -135,16 +137,25 @@ bool YXDBStorage::get(const DBKey &key, DBRecord &record, DBRecordMask mask) noe
+ 
+     std::shared_lock<std::shared_mutex> readerLock(mutex);
+ 
+-    auto it = recordsMap.find(key);
+-    if (ops.empty()) {
+-        if (it == recordsMap.end())
+-            return false;
+-        record.update(it->second, mask);
+-        return true;
++    bool     exists = false;
++    DBRecord merged {};
++    if (size_t i = findEntry(key); i != SIZE_MAX) {
++        if (ops.empty()) {
++            record.update(entryRecord(entries[i]), mask);
++            return true;
++        }
++        merged = entryRecord(entries[i]), exists = true;
++    }
++    else if (auto it = overlay.find(key); it != overlay.end()) {
++        if (ops.empty()) {
++            record.update(it->second, mask);
++            return true;
++        }
++        merged = it->second, exists = true;
+     }
++    if (ops.empty())
++        return false;
+ 
+-    bool     exists = it != recordsMap.end();
+-    DBRecord merged = exists ? it->second : DBRecord {};
+     readerLock.unlock();
+     for (const PendingOp &op : ops) {
+         if (op.isDelete)
+@@ -164,19 +175,47 @@ void YXDBStorage::applyLocked(const DBKey      &key,
+                               DBRecordMask      mask,
+                               bool              isDelete)
+ {
+-    auto it = recordsMap.find(key);
++    size_t i = findEntry(key, true);
+     if (isDelete) {
+-        if (it != recordsMap.end()) {
+-            recordsMap.erase(it);
++        if (i != SIZE_MAX) {
++            Entry &e = entries[i];
++            if (!(e.flags & ENTRY_DELETED)) {
++                if (e.flags & ENTRY_HAS_TEXT)
++                    entryTexts.erase(e.keyOff);
++                e.flags = (e.flags | ENTRY_DELETED) & ~ENTRY_HAS_TEXT;
++                numLiveEntries--;
++                dirty = true;
++            }
++        }
++        else if (auto it = overlay.find(key); it != overlay.end()) {
++            overlay.erase(it);
+             dirty = true;
+         }
+         return;
+     }
+ 
+-    if (it != recordsMap.end())
++    if (i != SIZE_MAX) {
++        Entry &e = entries[i];
++        if (e.flags & ENTRY_DELETED) {  // a new record for a deleted key
++            e.flags &= ~ENTRY_DELETED;
++            numLiveEntries++;
++            setEntryRecord(e, record);
++        }
++        else {
++            DBRecord current = entryRecord(e);
++            current.update(record, mask);
++            setEntryRecord(e, current);
++        }
++    }
++    else if (auto it = overlay.find(key); it != overlay.end())
+         it->second.update(record, mask);
+-    else
+-        recordsMap.insert(std::make_pair(key, record));
++    else {
++        overlay.emplace(std::piecewise_construct,
++                        std::forward_as_tuple(key),
++                        std::forward_as_tuple(record));
++        if (overlay.size() > std::max<size_t>(4096, entries.size() / 16))
++            mergeOverlay();
++    }
+     dirty = true;
+ }
+ 
+@@ -328,7 +367,7 @@ bool YXDBStorage::flush() noexcept
+ size_t YXDBStorage::size() noexcept
+ {
+     std::shared_lock<std::shared_mutex> readerLock(mutex);
+-    return recordsMap.size();
++    return numLiveEntries + overlay.size();
+ }
+ 
+ YXDBStorage::Cursor YXDBStorage::scan(Cursor                                   cursor,
+@@ -339,28 +378,244 @@ YXDBStorage::Cursor YXDBStorage::scan(Cursor                                   c
+ 
+     // Resume right after the last key of the previous batch (O(log n), and
+     // insertions/deletions between batches can not shift the scan position)
+-    auto it = cursor ? recordsMap.upper_bound(cursor.lastKey) : recordsMap.begin();
++    size_t i           = cursor ? upperBound(cursor.lastKey) : 0;
++    auto   it          = cursor ? overlay.upper_bound(cursor.lastKey) : overlay.begin();
++    auto   skipDeleted = [&] {
++        while (i < entries.size() && (entries[i].flags & ENTRY_DELETED))
++            i++;
++    };
+ 
+     bool  readAny = false;
+     DBKey lastKey;
+-    while (count > 0 && it != recordsMap.end()) {
+-        lastKey = DBKey(it->first);
+-        out.emplace_back(lastKey, it->second);
+-        it++;
++    skipDeleted();
++    while (count > 0 && (i < entries.size() || it != overlay.end())) {
++        bool takeMain = i < entries.size()
++                        && (it == overlay.end() || compareEntry(entries[i], it->first) < 0);
++        if (takeMain) {
++            lastKey = entryKey(entries[i]);
++            out.emplace_back(lastKey, entryRecord(entries[i]));
++            i++;
++            skipDeleted();
++        }
++        else {
++            lastKey = DBKey(it->first);
++            out.emplace_back(lastKey, it->second);
++            it++;
++        }
+         count--;
+         readAny = true;
+     }
+ 
+-    if (it == recordsMap.end())
++    if (i >= entries.size() && it == overlay.end())
+         return Cursor {};
+     return readAny ? Cursor {lastKey} : cursor;  // count == 0 call: position unchanged
+ }
+ 
++// ---------------------------------------------------------------------------
++// Main table
++
++bool YXDBStorage::KeyArena::allocate(uint32_t n, uint32_t &off, uint8_t *&ptr)
++{
++    if (n > BlockSize)
++        return false;
++    if (used + n > BlockSize) {
++        if (blocks.size() >= (size_t(1) << (32 - BlockBits)))
++            return false;
++        blocks.emplace_back(new uint8_t[BlockSize]);
++        used = 0;
++    }
++    off = uint32_t((blocks.size() - 1) << BlockBits) | used;
++    ptr = blocks.back().get() + used;
++    used += n;
++    return true;
++}
++
++template <typename Key>
++int YXDBStorage::compareEntry(const Entry &e, const Key &key) const
++{
++    if (int diff = (int)e.rule - (int)key.rule; diff != 0)
++        return diff;
++    if (int diff = (int)e.boardWidth - (int)key.boardWidth; diff != 0)
++        return diff;
++    if (int diff = (int)e.boardHeight - (int)key.boardHeight; diff != 0)
++        return diff;
++    int n = (int)e.numBlackStones + (int)e.numWhiteStones;
++    if (int diff = n - ((int)key.numBlackStones + (int)key.numWhiteStones); diff != 0)
++        return diff;
++    const uint8_t  *p = keyArena.at(e.keyOff);
++    const StonePos *s = &key.stones[0];
++    if (isNarrow(e.boardWidth, e.boardHeight)) {
++        // memcmp() order of the (x, y) byte pairs, bytes taken as unsigned
++        for (int k = 0; k < n; k++) {
++            int ex = p[k] >> 4, kx = (uint8_t)s[k].x;
++            if (ex != kx)
++                return ex - kx;
++            int ey = p[k] & 15, ky = (uint8_t)s[k].y;
++            if (ey != ky)
++                return ey - ky;
++        }
++    }
++    else if (int diff = std::memcmp(p, s, 2 * n); diff != 0)
++        return diff;
++    int stm = (e.flags & ENTRY_WHITE_TO_MOVE) ? WHITE : BLACK;
++    return stm - (int)key.sideToMove;
++}
++
++template <typename Key>
++size_t YXDBStorage::lowerBound(const Key &key) const
++{
++    size_t lo = 0, hi = entries.size();
++    while (lo < hi) {
++        size_t mid = lo + (hi - lo) / 2;
++        if (compareEntry(entries[mid], key) < 0)
++            lo = mid + 1;
++        else
++            hi = mid;
++    }
++    return lo;
++}
++
++template <typename Key>
++size_t YXDBStorage::upperBound(const Key &key) const
++{
++    size_t lo = 0, hi = entries.size();
++    while (lo < hi) {
++        size_t mid = lo + (hi - lo) / 2;
++        if (compareEntry(entries[mid], key) <= 0)
++            lo = mid + 1;
++        else
++            hi = mid;
++    }
++    return lo;
++}
++
++size_t YXDBStorage::findEntry(const DBKey &key, bool includeDeleted) const
++{
++    size_t i = lowerBound(key);
++    if (i < entries.size() && compareEntry(entries[i], key) == 0
++        && (includeDeleted || !(entries[i].flags & ENTRY_DELETED)))
++        return i;
++    return SIZE_MAX;
++}
++
++DBRecord YXDBStorage::entryRecord(const Entry &e) const
++{
++    DBRecord record {e.label, e.value, e.depthbound, std::string {}};
++    if (e.flags & ENTRY_HAS_TEXT)
++        if (auto it = entryTexts.find(e.keyOff); it != entryTexts.end())
++            record.text = it->second;
++    return record;
++}
++
++void YXDBStorage::setEntryRecord(Entry &e, const DBRecord &record)
++{
++    e.label      = record.label;
++    e.value      = record.value;
++    e.depthbound = record.depthbound;
++    if (!record.text.empty()) {
++        entryTexts[e.keyOff] = record.text;
++        e.flags |= ENTRY_HAS_TEXT;
++    }
++    else if (e.flags & ENTRY_HAS_TEXT) {
++        entryTexts.erase(e.keyOff);
++        e.flags &= ~ENTRY_HAS_TEXT;
++    }
++}
++
++DBKey YXDBStorage::entryKey(const Entry &e) const
++{
++    DBKey key;
++    key.rule           = static_cast<Rule>(e.rule);
++    key.boardWidth     = e.boardWidth;
++    key.boardHeight    = e.boardHeight;
++    key.sideToMove     = (e.flags & ENTRY_WHITE_TO_MOVE) ? WHITE : BLACK;
++    key.numBlackStones = e.numBlackStones;
++    key.numWhiteStones = e.numWhiteStones;
++    int            n   = e.numBlackStones + e.numWhiteStones;
++    const uint8_t *p   = keyArena.at(e.keyOff);
++    if (isNarrow(e.boardWidth, e.boardHeight))
++        for (int k = 0; k < n; k++)
++            key.stones[k] = StonePos {p[k] >> 4, p[k] & 15};
++    else
++        std::memcpy(key.stones, p, 2 * n);
++    return key;
++}
++
++template <typename Key>
++bool YXDBStorage::makeEntry(const Key &key, Entry &e)
++{
++    int  n      = key.numBlackStones + key.numWhiteStones;
++    bool narrow = isNarrow(key.boardWidth, key.boardHeight);
++    if (narrow)
++        for (int k = 0; k < n; k++)
++            if ((uint8_t)key.stones[k].x > 15 || (uint8_t)key.stones[k].y > 15)
++                return false;
++
++    // At least one byte, so that keyOff (the text table key) stays unique
++    uint8_t *p;
++    if (!keyArena.allocate(std::max(1, narrow ? n : 2 * n), e.keyOff, p))
++        return false;
++    if (narrow)
++        for (int k = 0; k < n; k++)
++            p[k] = uint8_t((key.stones[k].x << 4) | key.stones[k].y);
++    else
++        std::memcpy(p, key.stones, 2 * n);
++    e.numBlackStones = key.numBlackStones;
++    e.numWhiteStones = key.numWhiteStones;
++    e.rule           = key.rule;
++    e.boardWidth     = key.boardWidth;
++    e.boardHeight    = key.boardHeight;
++    e.flags          = key.sideToMove == WHITE ? ENTRY_WHITE_TO_MOVE : 0;
++    e.label          = LABEL_NULL;
++    e.value          = 0;
++    e.depthbound     = 0;
++    return true;
++}
++
++void YXDBStorage::mergeOverlay()
++{
++    std::vector<Entry> merged;
++    merged.reserve(numLiveEntries + overlay.size());
++
++    // Moves overlay records below `bound` (all of them when null) into merged.
++    // A key that does not pack stays in the overlay.
++    auto it        = overlay.begin();
++    auto drainUpTo = [&](const Entry *bound) {
++        while (it != overlay.end() && (!bound || compareEntry(*bound, it->first) > 0)) {
++            Entry e;
++            if (makeEntry(it->first, e)) {
++                setEntryRecord(e, it->second);
++                merged.push_back(e);
++                it = overlay.erase(it);
++            }
++            else
++                it++;
++        }
++    };
++    for (const Entry &e : entries) {
++        if (e.flags & ENTRY_DELETED)
++            continue;
++        drainUpTo(&e);
++        merged.push_back(e);
++    }
++    drainUpTo(nullptr);
++
++    entries.swap(merged);
++    numLiveEntries = entries.size();
++}
++
+ void YXDBStorage::load(std::istream &is, bool ignoreCorrupted)
+ {
+     uint32_t numRecords;
+     is.read(reinterpret_cast<char *>(&numRecords), sizeof(numRecords));
+ 
++    // The header count is exact for files we wrote; a bogus one only costs the hint.
++    try {
++        entries.reserve(numRecords);
++    }
++    catch (const std::exception &) {
++    }
++
+     std::vector<int8_t> byteBuffer;
+     byteBuffer.resize(1024);  // reserve initial space
+ 
+@@ -374,7 +629,8 @@ void YXDBStorage::load(std::istream &is, bool ignoreCorrupted)
+     bool              isUTF8       = false;  // Is this database UTF-8 encoded?
+     const std::string utf8Metadata = "charset=\"UTF-8\"";
+ 
+-    auto hint = recordsMap.begin();
++    bool                  sorted = true;  // files we wrote are; others are sorted below
++    std::vector<StonePos> stones(MAX_MOVES);
+     for (uint32_t recordIdx = 0; recordIdx < numRecords; recordIdx++) {
+         // Read record key
+         uint16_t numKeyBytes;
+@@ -417,7 +673,9 @@ void YXDBStorage::load(std::istream &is, bool ignoreCorrupted)
+         uint16_t numWhiteStones = numStones / 2;
+         Color    sideToMove     = numBlackStones == numWhiteStones ? BLACK : WHITE;
+ 
+-        auto   stones   = std::make_unique<StonePos[]>(numStones);
++        // Same filling as the original map loader: a pass move ends its color
++        // early and the slots left over at the end stay zero.
++        std::fill_n(stones.begin(), numStones, StonePos {0, 0});
+         size_t stoneIdx = 0;
+         for (uint16_t blackIdx = 0; blackIdx < numBlackStones; blackIdx++) {
+             int8_t x = byteBuffer[3 + blackIdx * 2];
+@@ -448,57 +706,133 @@ void YXDBStorage::load(std::istream &is, bool ignoreCorrupted)
+                                                         + std::to_string(recordIdx));
+         }
+ 
+-        // Read record message
+-        uint16_t numRecordBytes;
+-        is.read(reinterpret_cast<char *>(&numRecordBytes), sizeof(numRecordBytes));
+-        if (numRecordBytes > byteBuffer.size())
+-            byteBuffer.resize(numRecordBytes);
+-        is.read(reinterpret_cast<char *>(byteBuffer.data()), numRecordBytes);
+-
+-        // Parse metadata record
+-        if (boardXLen == 0 && boardYLen == 0 && numRecordBytes >= 5 + utf8Metadata.length()) {
+-            std::string metadata {reinterpret_cast<char *>(&byteBuffer[5]),
+-                                  static_cast<size_t>(numRecordBytes - 5)};
+-            if (metadata.rfind(utf8Metadata, 0) == 0)
+-                isUTF8 = true;
+-            continue;
+-        }
++        {
++            // Read record message
++            uint16_t numRecordBytes;
++            is.read(reinterpret_cast<char *>(&numRecordBytes), sizeof(numRecordBytes));
++            if (numRecordBytes > byteBuffer.size())
++                byteBuffer.resize(numRecordBytes);
++            is.read(reinterpret_cast<char *>(byteBuffer.data()), numRecordBytes);
++
++            // Parse metadata record
++            if (boardXLen == 0 && boardYLen == 0 && numRecordBytes >= 5 + utf8Metadata.length()) {
++                std::string metadata {reinterpret_cast<char *>(&byteBuffer[5]),
++                                      static_cast<size_t>(numRecordBytes - 5)};
++                if (metadata.rfind(utf8Metadata, 0) == 0)
++                    isUTF8 = true;
++                continue;
++            }
+ 
+-        // Emplace db key and db record in map
+-        hint = recordsMap.emplace_hint(
+-            hint,
+-            std::piecewise_construct,
+-            std::forward_as_tuple(rule,
+-                                  boardXLen,
+-                                  boardYLen,
+-                                  sideToMove,
+-                                  numBlackStones,
+-                                  numWhiteStones,
+-                                  stones.release()),
+-            std::forward_as_tuple(DBRecord {
+-                numRecordBytes > 0 ? static_cast<DBLabel>(byteBuffer[0]) : DBLabel(0),
+-                numRecordBytes > 2 ? DBValue(readInt16At(1)) : DBValue(0),
+-                numRecordBytes > 4 ? DBDepthBound(readInt16At(3)) : DBDepthBound(0),
+-                numRecordBytes > 5
+-                    ? (isUTF8 ? std::string {reinterpret_cast<char *>(&byteBuffer[5]),
+-                                             static_cast<size_t>(numRecordBytes - 5)}
+-                              : LegacyFileCPToUTF8(
+-                                    std::string {reinterpret_cast<char *>(&byteBuffer[5]),
+-                                                 static_cast<size_t>(numRecordBytes - 5)},
+-                                    DatabaseCfg.legacyFileCodePage))
+-                    : std::string {}}));
++            struct
++            {
++                Rule            rule;
++                int8_t          boardWidth, boardHeight;
++                Color           sideToMove;
++                uint16_t        numBlackStones, numWhiteStones;
++                const StonePos *stones;
++            } key {rule,
++                   (int8_t)boardXLen,
++                   (int8_t)boardYLen,
++                   sideToMove,
++                   numBlackStones,
++                   numWhiteStones,
++                   stones.data()};
++            // A repeated key keeps its first record, as std::map::emplace did.
++            int order = entries.empty() ? 1 : -compareEntry(entries.back(), key);
++            if (order == 0)
++                continue;
++            Entry e;
++            if (!makeEntry(key, e))
++                throw DBStorageError("YXDB file too large to load: "
++                                     + pathToConsoleString(filePath));
++            if (order < 0)
++                sorted = false;
++
++            setEntryRecord(
++                e,
++                DBRecord {
++                    numRecordBytes > 0 ? static_cast<DBLabel>(byteBuffer[0]) : DBLabel(0),
++                    numRecordBytes > 2 ? DBValue(readInt16At(1)) : DBValue(0),
++                    numRecordBytes > 4 ? DBDepthBound(readInt16At(3)) : DBDepthBound(0),
++                    numRecordBytes > 5
++                        ? (isUTF8 ? std::string {reinterpret_cast<char *>(&byteBuffer[5]),
++                                                 static_cast<size_t>(numRecordBytes - 5)}
++                                  : LegacyFileCPToUTF8(
++                                        std::string {reinterpret_cast<char *>(&byteBuffer[5]),
++                                                     static_cast<size_t>(numRecordBytes - 5)},
++                                        DatabaseCfg.legacyFileCodePage))
++                        : std::string {}});
++            entries.push_back(e);
++        }
+ 
+     next_record:;
+     }
+ 
++    if (!sorted) {
++        // Files from other writers may come in any order: sort, keeping the
++        // first record of each key like the map loader did.
++        std::stable_sort(entries.begin(), entries.end(), [this](const Entry &a, const Entry &b) {
++            return compareEntry(a, entryKey(b)) < 0;
++        });
++        size_t out = 0;
++        for (size_t k = 0; k < entries.size(); k++) {
++            if (out > 0 && compareEntry(entries[out - 1], entryKey(entries[k])) == 0) {
++                if (entries[k].flags & ENTRY_HAS_TEXT)
++                    entryTexts.erase(entries[k].keyOff);
++                continue;
++            }
++            entries[out++] = entries[k];
++        }
++        entries.resize(out);
++    }
++    if (entries.capacity() > entries.size() + entries.size() / 8)
++        entries.shrink_to_fit();
++    numLiveEntries = entries.size();
++
+     // Force convert old format to new utf-8 format
+     if (!isUTF8)
+         dirty = true;
+ }
+ 
++template <typename Put, typename Key>
++void YXDBStorage::putRecord(Put &put, const Key &key, const DBRecord &record)
++{
++    const int8_t PassMove[2] = {-1, -1};
++
++    // Serialize record key
++    Color    normalSTM   = (key.numBlackStones + key.numWhiteStones) % 2 == 0 ? BLACK : WHITE;
++    bool     addPassMove = normalSTM != key.sideToMove;
++    uint16_t numKeyBytes = 3 + 2 * (key.whiteStonesEnd() - key.blackStonesBegin() + addPassMove);
++    int8_t   head[3]     = {(int8_t)key.rule, key.boardWidth, key.boardHeight};
++
++    put(&numKeyBytes, sizeof(numKeyBytes));
++    put(head, 3);
++    put(key.blackStonesBegin(), (key.blackStonesEnd() - key.blackStonesBegin()) * 2);
++    if (addPassMove && normalSTM == BLACK)
++        put(PassMove, 2);
++    put(key.whiteStonesBegin(), (key.whiteStonesEnd() - key.whiteStonesBegin()) * 2);
++    if (addPassMove && normalSTM == WHITE)
++        put(PassMove, 2);
++
++    // Write record message
++    if (record.isNull()) {
++        uint16_t numRecordBytes = 0;
++        put(&numRecordBytes, sizeof(numRecordBytes));
++    }
++    else {
++        const std::string &utf8Text       = record.text;
++        uint16_t           numRecordBytes = 5 + utf8Text.length();
++        put(&numRecordBytes, sizeof(numRecordBytes));
++        put(&record.label, sizeof(DBLabel));
++        put(&record.value, sizeof(DBValue));
++        put(&record.depthbound, sizeof(DBDepthBound));
++        put(utf8Text.data(), utf8Text.length());
++    }
++}
++
+ void YXDBStorage::save(std::ostream &os) noexcept
+ {
+-    uint32_t numRecords = recordsMap.size() + 1;
++    uint32_t numRecords = numLiveEntries + overlay.size() + 1;
+     os.write(reinterpret_cast<char *>(&numRecords), sizeof(numRecords));
+ 
+     // Write a metadata record with board size equals to 0
+@@ -528,40 +862,16 @@ void YXDBStorage::save(std::ostream &os) noexcept
+         chunk.append(reinterpret_cast<const char *>(p), n);
+     };
+ 
+-    const int8_t PassMove[2] = {-1, -1};
+-    for (auto it = recordsMap.cbegin(); it != recordsMap.cend(); it++) {
+-        const CompactDBKey &key    = it->first;
+-        const DBRecord     &record = it->second;
+-
+-        // Serialize record key
+-        Color    normalSTM   = (key.numBlackStones + key.numWhiteStones) % 2 == 0 ? BLACK : WHITE;
+-        bool     addPassMove = normalSTM != key.sideToMove;
+-        uint16_t numKeyBytes =
+-            3 + 2 * (key.whiteStonesEnd() - key.blackStonesBegin() + addPassMove);
+-
+-        put(&numKeyBytes, sizeof(numKeyBytes));
+-        put(&key, 3);
+-        put(key.blackStonesBegin(), (key.blackStonesEnd() - key.blackStonesBegin()) * 2);
+-        if (addPassMove && normalSTM == BLACK)
+-            put(PassMove, 2);
+-        put(key.whiteStonesBegin(), (key.whiteStonesEnd() - key.whiteStonesBegin()) * 2);
+-        if (addPassMove && normalSTM == WHITE)
+-            put(PassMove, 2);
+-
+-        // Write record message
+-        if (record.isNull()) {
+-            uint16_t numRecordBytes = 0;
+-            put(&numRecordBytes, sizeof(numRecordBytes));
+-        }
+-        else {
+-            const std::string &utf8Text       = record.text;
+-            uint16_t           numRecordBytes = 5 + utf8Text.length();
+-            put(&numRecordBytes, sizeof(numRecordBytes));
+-            put(&record.label, sizeof(DBLabel));
+-            put(&record.value, sizeof(DBValue));
+-            put(&record.depthbound, sizeof(DBDepthBound));
+-            put(utf8Text.data(), utf8Text.length());
+-        }
++    // Main table and overlay merged in key order, as the single map wrote them
++    auto it = overlay.cbegin();
++    for (size_t i = 0; i <= entries.size(); i++) {
++        const Entry *e = i < entries.size() ? &entries[i] : nullptr;
++        if (e && (e->flags & ENTRY_DELETED))
++            continue;
++        for (; it != overlay.cend() && (!e || compareEntry(*e, it->first) > 0); it++)
++            putRecord(put, it->first, it->second);
++        if (e)
++            putRecord(put, entryKey(*e), entryRecord(*e));
+ 
+         if (chunk.size() >= ChunkSize) {
+             os.write(chunk.data(), chunk.size());
+diff --git a/Rapfi/database/yxdbstorage.h b/Rapfi/database/yxdbstorage.h
+index 2c68c2c..4b280ed 100644
+--- a/Rapfi/database/yxdbstorage.h
++++ b/Rapfi/database/yxdbstorage.h
+@@ -23,8 +23,11 @@
+ #include <atomic>
+ #include <filesystem>
+ #include <map>
++#include <memory>
+ #include <mutex>
+ #include <shared_mutex>
++#include <string>
++#include <unordered_map>
+ #include <vector>
+ 
+ namespace Database {
+@@ -139,9 +142,67 @@ private:
+         bool         isDelete;
+     };
+ 
+-    std::filesystem::path                             filePath;
+-    std::map<CompactDBKey, DBRecord, CompactDBKeyCmp> recordsMap;
+-    std::shared_mutex                                 mutex;
++    /// One record of the sorted main table (20 bytes). The key's stones live
++    /// in the key arena: one byte per stone ((x << 4) | y) on boards up to
++    /// 16x16, otherwise the original two bytes (x, y). A narrow byte sorts
++    /// exactly like the (x, y) pair memcmp() compares, so the main table keeps
++    /// the order of databaseKeyCompare(). Text is rare (0.2% of records in the
++    /// field) and sits in a side table keyed by keyOff.
++    struct Entry
++    {
++        uint32_t     keyOff;
++        uint16_t     numBlackStones;
++        uint16_t     numWhiteStones;
++        uint8_t      rule;
++        int8_t       boardWidth;
++        int8_t       boardHeight;
++        uint8_t      flags;
++        DBLabel      label;
++        DBValue      value;
++        DBDepthBound depthbound;
++    };
++    enum EntryFlag : uint8_t {
++        ENTRY_WHITE_TO_MOVE = 1 << 0,
++        ENTRY_DELETED       = 1 << 1,
++        ENTRY_HAS_TEXT      = 1 << 2,
++    };
++    using OverlayMap = std::map<CompactDBKey, DBRecord, CompactDBKeyCmp>;
++
++    /// Append-only storage of packed stones, in 1MB blocks: growing never
++    /// moves existing keys, so loading has no reallocation peak.
++    class KeyArena
++    {
++    public:
++        static constexpr uint32_t BlockBits = 20;
++        static constexpr uint32_t BlockSize = 1u << BlockBits;
++        const uint8_t            *at(uint32_t off) const
++        {
++            return blocks[off >> BlockBits].get() + (off & (BlockSize - 1));
++        }
++        /// Reserves n contiguous bytes. Returns false if the arena is full (4GB).
++        bool allocate(uint32_t n, uint32_t &off, uint8_t *&ptr);
++        void clear()
++        {
++            blocks.clear();
++            used = BlockSize;
++        }
++        size_t memoryBytes() const { return blocks.size() * size_t(BlockSize); }
++
++    private:
++        std::vector<std::unique_ptr<uint8_t[]>> blocks;
++        uint32_t                                used = BlockSize;  // used bytes of the last block
++    };
++
++    std::filesystem::path filePath;
++    // The records: a sorted vector loaded from the file, plus new keys added
++    // since in a small map. Updates of keys in the main table happen in place,
++    // deletes only flag them. mergeOverlay() folds the map back in.
++    std::vector<Entry>                        entries;
++    KeyArena                                  keyArena;
++    std::unordered_map<uint32_t, std::string> entryTexts;  // keyOff -> utf-8 text
++    size_t                                    numLiveEntries = 0;
++    OverlayMap                                overlay;
++    std::shared_mutex                         mutex;
+     int                                               numBackupsOnSave;
+     bool                                              compressedSave;
+     bool                                              saveOnClose;
+@@ -166,6 +227,33 @@ private:
+     bool writeFile(const std::filesystem::path &path) noexcept;
+     /// Apply one write to the map. Caller holds the unique lock.
+     void applyLocked(const DBKey &key, const DBRecord &record, DBRecordMask mask, bool isDelete);
++
++    // Main table helpers. Caller holds the lock (shared for reads).
++    static bool isNarrow(int width, int height) { return width <= 16 && height <= 16; }
++    /// Three-way compare of a main entry against any key with a `stones` array,
++    /// in databaseKeyCompare() order.
++    template <typename Key>
++    int compareEntry(const Entry &e, const Key &key) const;
++    /// Index of the first main entry not less than key (deleted ones included).
++    template <typename Key>
++    size_t lowerBound(const Key &key) const;
++    template <typename Key>
++    size_t upperBound(const Key &key) const;
++    /// Index of the live main entry equal to key, or SIZE_MAX.
++    size_t findEntry(const DBKey &key, bool includeDeleted = false) const;
++    DBRecord entryRecord(const Entry &e) const;
++    void     setEntryRecord(Entry &e, const DBRecord &record);
++    DBKey    entryKey(const Entry &e) const;
++    /// Packs key into a new main entry (record fields unset). False if it does
++    /// not fit the narrow encoding (a coordinate outside 0..15) or the arena.
++    template <typename Key>
++    bool makeEntry(const Key &key, Entry &e);
++    /// Folds the overlay into the sorted main table and drops deleted entries
++    /// (their arena bytes stay until the next load). Caller holds the unique lock.
++    void mergeOverlay();
++    /// Writes one record in the yixindb layout.
++    template <typename Put, typename Key>
++    static void putRecord(Put &put, const Key &key, const DBRecord &record);
+ };
+ 
+ }  // namespace Database

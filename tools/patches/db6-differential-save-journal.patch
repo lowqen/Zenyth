@@ -1,0 +1,701 @@
+diff --git a/Rapfi/command/gomocup.cpp b/Rapfi/command/gomocup.cpp
+index 842ac16..e8c1480 100644
+--- a/Rapfi/command/gomocup.cpp
++++ b/Rapfi/command/gomocup.cpp
+@@ -87,15 +87,19 @@ void waitDatabaseSave()
+ }
+ 
+ /// YXSAVEDATABASE: prints "Saved database file using N ms." when done, as before.
+-void startDatabaseSave()
++/// YXCOMPACTDATABASE (compact = true): the same, but folds a journal into the file.
++void startDatabaseSave(bool compact = false)
+ {
+     Database::DBStorage *storage = Search::Engine.dbStorage();
+     if (!storage)
+         return;
+ 
+-    auto saveNow = [storage] {
++    auto saveNow = [storage, compact] {
+         auto startTime = now();
+-        storage->flush();
++        if (compact)
++            storage->compact();
++        else
++            storage->flush();
+         MESSAGEL("Saved database file using " << (now() - startTime) << " ms.");
+     };
+ 
+@@ -860,6 +864,7 @@ bool runProtocol()
+     // Saving only reads the storage (writes from search are queued meanwhile), so it
+     // neither stops nor waits for a running search or ponder.
+     else if (cmd == "YXSAVEDATABASE")          return startDatabaseSave(), false;
++    else if (cmd == "YXCOMPACTDATABASE")       return startDatabaseSave(true), false;
+     else if (thinking)                         return false;
+ 
+ #ifdef MULTI_THREADING
+diff --git a/Rapfi/config.cpp b/Rapfi/config.cpp
+index 92fe068..c9879e9 100644
+--- a/Rapfi/config.cpp
++++ b/Rapfi/config.cpp
+@@ -555,6 +555,10 @@ void Config::readDatabase(const cpptoml::table &t, PendingConfig &pending)
+                 args->get_as<int>("num_backups_on_save").value_or(cfg.yixindb.numBackupsOnSave);
+             cfg.yixindb.ignoreCorrupted =
+                 args->get_as<bool>("ignore_corrupted").value_or(cfg.yixindb.ignoreCorrupted);
++            cfg.yixindb.journal = args->get_as<bool>("journal").value_or(cfg.yixindb.journal);
++            cfg.yixindb.journalCompactPercent =
++                args->get_as<int>("journal_compact_percent")
++                    .value_or(cfg.yixindb.journalCompactPercent);
+         }
+         cfg.factoryEnabled = true;
+     }
+diff --git a/Rapfi/database/dbconfig.cpp b/Rapfi/database/dbconfig.cpp
+index 4b8aa42..16a38ac 100644
+--- a/Rapfi/database/dbconfig.cpp
++++ b/Rapfi/database/dbconfig.cpp
+@@ -36,7 +36,9 @@ std::unique_ptr<DBStorage> openDBStorage(const DatabaseConfig &cfg, std::string
+                                              cfg.yixindb.compressedSave,
+                                              cfg.yixindb.saveOnClose,
+                                              cfg.yixindb.numBackupsOnSave,
+-                                             cfg.yixindb.ignoreCorrupted);
++                                             cfg.yixindb.ignoreCorrupted,
++                                             cfg.yixindb.journal,
++                                             cfg.yixindb.journalCompactPercent);
+     }
+     throw std::invalid_argument("unknown database type " + cfg.type);
+ }
+diff --git a/Rapfi/database/dbconfig.h b/Rapfi/database/dbconfig.h
+index 7db540e..15ae9ca 100644
+--- a/Rapfi/database/dbconfig.h
++++ b/Rapfi/database/dbconfig.h
+@@ -60,6 +60,11 @@ struct DatabaseConfig
+         bool saveOnClose      = true;
+         int  numBackupsOnSave = 1;
+         bool ignoreCorrupted  = false;
++        /// Save changes to <db>.journal instead of rewriting the whole file;
++        /// the file is rewritten (journal folded in) once the journal grows
++        /// past journalCompactPercent of the file, or on YXCOMPACTDATABASE.
++        bool journal               = false;
++        int  journalCompactPercent = 25;
+     } yixindb;
+ 
+     /// Parse state, not a TOML knob: mirrors the legacy null-DatabaseMaker
+diff --git a/Rapfi/database/dbstorage.h b/Rapfi/database/dbstorage.h
+index 92365e8..0aa8a93 100644
+--- a/Rapfi/database/dbstorage.h
++++ b/Rapfi/database/dbstorage.h
+@@ -223,6 +223,12 @@ public:
+     /// return Whether the flush operation succeeded.
+     virtual bool flush() noexcept = 0;
+ 
++    /// Like flush(), but leaves the storage in its plain, self-contained form
++    /// (for a storage with a differential journal: rewrite the whole file and
++    /// fold the journal in). Use before the file is copied or handed to
++    /// another program. Defaults to flush().
++    virtual bool compact() noexcept { return flush(); }
++
+     /// Return the number of entries in the database.
+     virtual size_t size() noexcept = 0;
+ 
+diff --git a/Rapfi/database/yxdbstorage.cpp b/Rapfi/database/yxdbstorage.cpp
+index 8a8963b..9c161ad 100644
+--- a/Rapfi/database/yxdbstorage.cpp
++++ b/Rapfi/database/yxdbstorage.cpp
+@@ -63,16 +63,331 @@ CompactDBKey::operator DBKey() const
+     return key;
+ }
+ 
++// ---------------------------------------------------------------------------
++// Journal (differential save)
++//
++// <db>.journal extends the base file <db> with the changes saved since it was
++// written. Layout (little-endian):
++//   header  "RYDBJNL1" | u64 base size | u64 base tail hash | u64 reserved
++//   block*  u32 'JBLK' | u32 payload bytes | u32 ops | payload | u64 FNV-1a(payload)
++//   op      u8 1 (put) | key | record      -- key/record in the yixindb layout
++//           u8 2 (del) | key
++// A block is one flush; a torn block (killed mid-append) fails its checksum and
++// is cut off at the next load. The header names the base by size and a hash of
++// its last 4KB (for LZ4 files that tail holds the content checksum), so a
++// journal never lands on a base it was not written against: after a full save
++// the base changes first and the stale journal is ignored, then reset.
++
++namespace {
++
++constexpr char     JournalMagic[8]   = {'R', 'Y', 'D', 'B', 'J', 'N', 'L', '1'};
++constexpr uint32_t JournalBlockMagic = 0x4B4C424A;  // "JBLK"
++constexpr size_t   JournalHeaderSize = 32;
++constexpr uint32_t JournalMaxBlock   = 1u << 30;
++constexpr uint8_t  JournalOpPut      = 1;
++constexpr uint8_t  JournalOpDel      = 2;
++
++uint64_t fnv1a(const void *data, size_t n, uint64_t h = 0xcbf29ce484222325ULL)
++{
++    auto p = static_cast<const uint8_t *>(data);
++    for (size_t i = 0; i < n; i++)
++        h = (h ^ p[i]) * 0x100000001b3ULL;
++    return h;
++}
++
++template <typename T>
++void putLE(std::string &s, T v)
++{
++    s.append(reinterpret_cast<const char *>(&v), sizeof(T));
++}
++
++template <typename T>
++bool getLE(const char *&p, const char *end, T &v)
++{
++    if (size_t(end - p) < sizeof(T))
++        return false;
++    std::memcpy(&v, p, sizeof(T));
++    p += sizeof(T);
++    return true;
++}
++
++}  // namespace
++
++std::filesystem::path YXDBStorage::journalPath() const
++{
++    std::filesystem::path p = filePath;
++    p += ".journal";
++    return p;
++}
++
++bool YXDBStorage::fileIdentity(const std::filesystem::path &path, uint64_t &size, uint64_t &hash)
++{
++    std::error_code ec;
++    size = std::filesystem::file_size(path, ec);
++    if (ec)
++        return false;
++    std::ifstream f(path, std::ios::binary);
++    if (!f)
++        return false;
++    size_t            n = size_t(std::min<uint64_t>(size, 4096));
++    std::vector<char> tail(n);
++    f.seekg(std::streamoff(size - n));
++    f.read(tail.data(), n);
++    if (!f)
++        return false;
++    hash = fnv1a(tail.data(), n);
++    return true;
++}
++
++void YXDBStorage::journalPut(const DBKey &key, const DBRecord &record)
++{
++    auto put = [this](const void *p, size_t n) {
++        journalBuf.append(reinterpret_cast<const char *>(p), n);
++    };
++    journalBuf.push_back(char(JournalOpPut));
++    putKey(put, key);
++    putBody(put, record);
++    journalOps++;
++}
++
++void YXDBStorage::journalDel(const DBKey &key)
++{
++    auto put = [this](const void *p, size_t n) {
++        journalBuf.append(reinterpret_cast<const char *>(p), n);
++    };
++    journalBuf.push_back(char(JournalOpDel));
++    putKey(put, key);
++    journalOps++;
++}
++
++/// Parses one key in the yixindb layout, exactly as load() reads it.
++static bool parseJournalKey(const char *&p, const char *end, DBKey &key)
++{
++    uint16_t numKeyBytes;
++    if (!getLE(p, end, numKeyBytes) || numKeyBytes < 3 || size_t(end - p) < numKeyBytes)
++        return false;
++    auto b = reinterpret_cast<const int8_t *>(p);
++    p += numKeyBytes;
++
++    Rule rule      = static_cast<Rule>(b[0]);
++    int  boardXLen = b[1], boardYLen = b[2];
++    if (rule >= RULE_NB || (unsigned)boardXLen > MAX_BOARD_SIZE
++        || (unsigned)boardYLen > MAX_BOARD_SIZE)
++        return false;
++    uint16_t numStones = (numKeyBytes - 3) / 2;
++    if (numStones > boardXLen * boardYLen)
++        return false;
++
++    key.rule           = rule;
++    key.boardWidth     = boardXLen;
++    key.boardHeight    = boardYLen;
++    key.numBlackStones = (numStones + 1) / 2;
++    key.numWhiteStones = numStones / 2;
++    key.sideToMove     = key.numBlackStones == key.numWhiteStones ? BLACK : WHITE;
++    std::fill_n(key.stones, numStones, StonePos {0, 0});
++    size_t stoneIdx = 0;
++    for (int color = 0; color < 2; color++) {
++        int begin = color == 0 ? 0 : key.numBlackStones;
++        int count = color == 0 ? key.numBlackStones : key.numWhiteStones;
++        for (int i = 0; i < count; i++) {
++            int8_t x = b[3 + (begin + i) * 2], y = b[4 + (begin + i) * 2];
++            if (x == -1 && y == -1)
++                break;
++            if (x < 0 || y < 0 || x >= boardXLen || y >= boardYLen)
++                return false;
++            key.stones[stoneIdx++] = {x, y};
++        }
++    }
++    return true;
++}
++
++static bool parseJournalRecord(const char *&p, const char *end, DBRecord &record)
++{
++    uint16_t n;
++    if (!getLE(p, end, n) || size_t(end - p) < n)
++        return false;
++    auto readInt16At = [p](size_t offset) {
++        int16_t v;
++        std::memcpy(&v, p + offset, sizeof(v));
++        return v;
++    };
++    record.label      = n > 0 ? static_cast<DBLabel>(p[0]) : DBLabel(0);
++    record.value      = n > 2 ? DBValue(readInt16At(1)) : DBValue(0);
++    record.depthbound = n > 4 ? DBDepthBound(readInt16At(3)) : DBDepthBound(0);
++    record.text       = n > 5 ? std::string {p + 5, size_t(n - 5)} : std::string {};
++    p += n;
++    return true;
++}
++
++void YXDBStorage::replayJournal()
++{
++    journalValidSize = 0;
++    if (!fileIdentity(filePath, baseSize, baseTailHash)) {
++        baseSize = baseTailHash = 0;
++        return;
++    }
++
++    std::filesystem::path jp = journalPath();
++    std::error_code       ec;
++    if (!std::filesystem::exists(jp, ec))
++        return;
++    uint64_t fileSize = std::filesystem::file_size(jp, ec);
++    if (ec)
++        return;
++
++    std::ifstream f(jp, std::ios::binary);
++    char          header[JournalHeaderSize];
++    uint64_t      size = 0, hash = 0;
++    if (f.read(header, JournalHeaderSize)) {
++        std::memcpy(&size, header + 8, 8);
++        std::memcpy(&hash, header + 16, 8);
++    }
++    if (!f || std::memcmp(header, JournalMagic, 8) != 0 || size != baseSize
++        || hash != baseTailHash) {
++        // Written against another base (a full save that died before resetting
++        // the journal, or a file replaced from outside): the base is the truth.
++        f.close();
++        MESSAGEL("DATABASE JOURNAL IGNORED (other base) " + pathToConsoleString(jp));
++        std::filesystem::remove(jp, ec);
++        return;
++    }
++
++    uint64_t    validEnd = JournalHeaderSize;
++    size_t      numOps   = 0;
++    std::string payload;
++    journalReplaying = true;
++    while (true) {
++        uint32_t blockHead[3];
++        if (!f.read(reinterpret_cast<char *>(blockHead), sizeof(blockHead)))
++            break;
++        if (blockHead[0] != JournalBlockMagic || blockHead[1] > JournalMaxBlock)
++            break;
++        payload.resize(blockHead[1]);
++        uint64_t checksum;
++        if (!f.read(payload.data(), payload.size())
++            || !f.read(reinterpret_cast<char *>(&checksum), sizeof(checksum)))
++            break;
++        if (checksum != fnv1a(payload.data(), payload.size()))
++            break;
++
++        // Validate the whole block first, then apply: a block is all or nothing.
++        // (Two passes over the bytes rather than a vector of 1.8KB DBKeys.)
++        DBKey    key;
++        DBRecord record;
++        auto     walk = [&](bool apply) {
++            const char *p = payload.data(), *end = p + payload.size();
++            for (uint32_t i = 0; i < blockHead[2]; i++) {
++                uint8_t op;
++                if (!getLE(p, end, op) || (op != JournalOpPut && op != JournalOpDel)
++                    || !parseJournalKey(p, end, key)
++                    || (op == JournalOpPut && !parseJournalRecord(p, end, record)))
++                    return false;
++                if (apply)
++                    applyLocked(key, record, RECORD_MASK_ALL, op == JournalOpDel);
++            }
++            return p == end;
++        };
++        if (!walk(false))
++            break;
++        walk(true);
++        numOps += blockHead[2];
++        validEnd += sizeof(blockHead) + payload.size() + sizeof(checksum);
++    }
++    journalReplaying = false;
++    f.close();
++    dirty = false;  // memory now equals base + journal, both on disk
++
++    if (validEnd < fileSize) {
++        std::filesystem::resize_file(jp, validEnd, ec);  // cut a torn last block
++        if (ec) {
++            MESSAGEL("DATABASE JOURNAL TAIL NOT CUT " + pathToConsoleString(jp));
++            fullSaveRequired = true;
++        }
++    }
++    journalValidSize = validEnd;
++    MESSAGEL("DATABASE JOURNAL REPLAYED " << numOps << " records");
++}
++
++bool YXDBStorage::appendJournal(const std::string &buf, uint32_t ops)
++{
++    std::filesystem::path jp = journalPath();
++    std::error_code       ec;
++    if (journalValidSize == 0 && !resetJournal())
++        return false;
++    // Drop anything past the last good block before appending
++    if (std::filesystem::file_size(jp, ec) != journalValidSize || ec) {
++        std::filesystem::resize_file(jp, journalValidSize, ec);
++        if (ec)
++            return false;
++    }
++
++    std::string block;
++    block.reserve(buf.size() + 20);
++    putLE(block, JournalBlockMagic);
++    putLE(block, uint32_t(buf.size()));
++    putLE(block, ops);
++    block += buf;
++    putLE(block, fnv1a(buf.data(), buf.size()));
++
++    std::ofstream f(jp, std::ios::binary | std::ios::app);
++    if (!f)
++        return false;
++    f.write(block.data(), block.size());
++    f.close();
++    if (f.fail())
++        return false;
++    journalValidSize += block.size();
++    return true;
++}
++
++bool YXDBStorage::resetJournal()
++{
++    std::filesystem::path jp = journalPath(), tmp = jp;
++    tmp += ".tmp";
++    std::error_code ec;
++
++    std::string header(JournalMagic, 8);
++    putLE(header, baseSize);
++    putLE(header, baseTailHash);
++    putLE(header, uint64_t(0));
++    {
++        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
++        f.write(header.data(), header.size());
++        f.close();
++        if (f.fail()) {
++            std::filesystem::remove(tmp, ec);
++            return false;
++        }
++    }
++    std::filesystem::rename(tmp, jp, ec);
++    if (ec) {
++        std::error_code ec2;
++        std::filesystem::remove(jp, ec2);
++        std::filesystem::rename(tmp, jp, ec);
++    }
++    if (ec) {
++        std::filesystem::remove(tmp, ec);
++        journalValidSize = 0;
++        return false;
++    }
++    journalValidSize = JournalHeaderSize;
++    return true;
++}
++
+ YXDBStorage::YXDBStorage(std::filesystem::path filePath,
+                          bool                  compressedSave,
+                          bool                  saveOnClose,
+                          int                   numBackupsOnSave,
+-                         bool                  ignoreCorrupted)
++                         bool                  ignoreCorrupted,
++                         bool                  journal,
++                         int                   journalCompactPercent)
+     : filePath(filePath)
+     , numBackupsOnSave(numBackupsOnSave)
+     , compressedSave(compressedSave)
+     , saveOnClose(saveOnClose)
+     , dirty(false)
++    , journalEnabled(journal)
++    , journalCompactPercent(std::max(1, journalCompactPercent))
+ {
+     // A leftover from a save that was killed midway: the real file is intact.
+     {
+@@ -111,6 +426,15 @@ YXDBStorage::YXDBStorage(std::filesystem::path filePath,
+ 
+         load(*istreamPtr, ignoreCorrupted);
+     }
++    file.close();
++
++    // Changes saved since the file was written. Replayed even with the journal
++    // turned off, so that turning it off never loses them; the next save then
++    // rewrites the file and drops the journal.
++    bool legacyFormat = dirty;
++    replayJournal();
++    if (legacyFormat || (!journalEnabled && journalValidSize > 0))
++        dirty = true, fullSaveRequired = true;
+ 
+     MESSAGEL("DATABASE LOAD DONE");
+ }
+@@ -185,34 +509,48 @@ void YXDBStorage::applyLocked(const DBKey      &key,
+                 e.flags = (e.flags | ENTRY_DELETED) & ~ENTRY_HAS_TEXT;
+                 numLiveEntries--;
+                 dirty = true;
++                if (journalEnabled && !journalReplaying)
++                    journalDel(key);
+             }
+         }
+         else if (auto it = overlay.find(key); it != overlay.end()) {
+             overlay.erase(it);
+             dirty = true;
++            if (journalEnabled && !journalReplaying)
++                journalDel(key);
+         }
+         return;
+     }
+ 
++    bool journalThis = journalEnabled && !journalReplaying;
+     if (i != SIZE_MAX) {
+         Entry &e = entries[i];
+         if (e.flags & ENTRY_DELETED) {  // a new record for a deleted key
+             e.flags &= ~ENTRY_DELETED;
+             numLiveEntries++;
+             setEntryRecord(e, record);
++            if (journalThis)
++                journalPut(key, record);
+         }
+         else {
+             DBRecord current = entryRecord(e);
+             current.update(record, mask);
+             setEntryRecord(e, current);
++            if (journalThis)
++                journalPut(key, current);
+         }
+     }
+-    else if (auto it = overlay.find(key); it != overlay.end())
++    else if (auto it = overlay.find(key); it != overlay.end()) {
+         it->second.update(record, mask);
++        if (journalThis)
++            journalPut(key, it->second);
++    }
+     else {
+         overlay.emplace(std::piecewise_construct,
+                         std::forward_as_tuple(key),
+                         std::forward_as_tuple(record));
++        if (journalThis)
++            journalPut(key, record);
+         if (overlay.size() > std::max<size_t>(4096, entries.size() / 16))
+             mergeOverlay();
+     }
+@@ -271,17 +609,69 @@ bool YXDBStorage::writeFile(const std::filesystem::path &path) noexcept
+ }
+ 
+ bool YXDBStorage::flush() noexcept
++{
++    return flushImpl(false);
++}
++
++bool YXDBStorage::compact() noexcept
++{
++    return flushImpl(true);
++}
++
++bool YXDBStorage::flushImpl(bool compact) noexcept
+ {
+     std::lock_guard<std::mutex> flushLock(flushMutex);
+ 
++    bool        exists = std::filesystem::exists(filePath);
++    bool        useJournal;
++    std::string buf;
++    uint32_t    ops = 0;
+     {
+         std::lock_guard<std::mutex>         pendingLock(pendingMutex);
+-        std::shared_lock<std::shared_mutex> readerLock(mutex);  // waits for in-flight writers
+-        if (!dirty && std::filesystem::exists(filePath))
++        std::unique_lock<std::shared_mutex> writerLock(mutex);  // waits for in-flight writers
++        bool journalHasData = journalValidSize > JournalHeaderSize;
++        if (!dirty && exists && !(compact && (journalHasData || fullSaveRequired)))
+             return true;
++        useJournal = journalEnabled && !compact && !fullSaveRequired && exists && baseSize != 0;
++        if (useJournal) {
++            buf.swap(journalBuf);
++            std::swap(ops, journalOps);
++            dirty = false;
++        }
++    }
++
++    if (useJournal) {
++        // The file must still be the one the journal extends.
++        uint64_t size = 0, hash = 0;
++        bool     sameBase = fileIdentity(filePath, size, hash) && size == baseSize
++                        && hash == baseTailHash;
++        if (sameBase && (ops == 0 || appendJournal(buf, ops))) {
++            uint64_t limit = std::max<uint64_t>(64 << 10, baseSize / 100 * journalCompactPercent);
++            if (journalValidSize <= limit)
++                return true;
++            // Journal too long: fold it into the file (the ops are in memory).
++        }
++        else {
++            MESSAGEL("DATABASE JOURNAL NOT WRITTEN, saving the whole file");
++            std::lock_guard<std::mutex>         pendingLock(pendingMutex);
++            std::unique_lock<std::shared_mutex> writerLock(mutex);
++            dirty = true;
++        }
++    }
++    return fullSave();
++}
++
++bool YXDBStorage::fullSave() noexcept
++{
++    {
++        std::lock_guard<std::mutex>         pendingLock(pendingMutex);
++        std::unique_lock<std::shared_mutex> writerLock(mutex);  // waits for in-flight writers
+         dirty  = false;
+         saving = true;
+         savingHint.store(true, std::memory_order_release);
++        // Everything up to here goes into the file; the journal restarts from it.
++        journalBuf.clear();
++        journalOps = 0;
+     }
+ 
+     MESSAGEL("DATABASE SAVE START " + pathToConsoleString(filePath));
+@@ -342,6 +732,22 @@ bool YXDBStorage::flush() noexcept
+     if (!ok)
+         std::filesystem::remove(tmpPath, ec);
+ 
++    // The new file stands on its own: restart the journal from it. Until the
++    // reset lands, the old journal names the old file and will be ignored.
++    if (ok) {
++        if (!fileIdentity(filePath, baseSize, baseTailHash))
++            baseSize = baseTailHash = 0;
++        if (journalEnabled && baseSize)
++            resetJournal();
++        else {
++            std::filesystem::remove(journalPath(), ec);
++            journalValidSize = 0;
++        }
++        fullSaveRequired = false;
++    }
++    else
++        fullSaveRequired = true;  // the journal buffer was dropped above
++
+     // 3. Replay the writes that arrived meanwhile; they are not in the file.
+     {
+         std::lock_guard<std::mutex>         pendingLock(pendingMutex);
+@@ -795,7 +1201,7 @@ void YXDBStorage::load(std::istream &is, bool ignoreCorrupted)
+ }
+ 
+ template <typename Put, typename Key>
+-void YXDBStorage::putRecord(Put &put, const Key &key, const DBRecord &record)
++void YXDBStorage::putKey(Put &put, const Key &key)
+ {
+     const int8_t PassMove[2] = {-1, -1};
+ 
+@@ -813,7 +1219,11 @@ void YXDBStorage::putRecord(Put &put, const Key &key, const DBRecord &record)
+     put(key.whiteStonesBegin(), (key.whiteStonesEnd() - key.whiteStonesBegin()) * 2);
+     if (addPassMove && normalSTM == WHITE)
+         put(PassMove, 2);
++}
+ 
++template <typename Put>
++void YXDBStorage::putBody(Put &put, const DBRecord &record)
++{
+     // Write record message
+     if (record.isNull()) {
+         uint16_t numRecordBytes = 0;
+diff --git a/Rapfi/database/yxdbstorage.h b/Rapfi/database/yxdbstorage.h
+index 4b280ed..921ea5a 100644
+--- a/Rapfi/database/yxdbstorage.h
++++ b/Rapfi/database/yxdbstorage.h
+@@ -111,8 +111,10 @@ public:
+     YXDBStorage(std::filesystem::path filePath,
+                 bool                  compressedSave,
+                 bool                  saveOnClose,
+-                int                   numBackupsOnSave = 1,
+-                bool                  ignoreCorrupted  = false);
++                int                   numBackupsOnSave      = 1,
++                bool                  ignoreCorrupted       = false,
++                bool                  journal               = false,
++                int                   journalCompactPercent = 25);
+     /// Close the yixin database. All unsaved records will be flushed to file.
+     virtual ~YXDBStorage();
+ 
+@@ -125,6 +127,7 @@ public:
+     void   set(const DBKey &key, const DBRecord &record, DBRecordMask mask) noexcept override;
+     void   del(const DBKey &key) noexcept override;
+     bool   flush() noexcept override;
++    bool   compact() noexcept override;
+     size_t size() noexcept override;
+     Cursor scan(Cursor                                   cursor,
+                 size_t                                   count,
+@@ -219,12 +222,38 @@ private:
+     std::atomic<bool>      savingHint {false};  // lock-free fast path for get()
+     std::vector<PendingOp> pendingOps;  // guarded by pendingMutex
+ 
++    // Differential save (see the journal section of the .cpp).
++    bool        journalEnabled;
++    int         journalCompactPercent;
++    bool        journalReplaying = false;
++    bool        fullSaveRequired = false;  // next flush rewrites the file (flushMutex)
++    std::string journalBuf;                // ops since the last flush (unique lock)
++    uint32_t    journalOps       = 0;      // ops in journalBuf (unique lock)
++    uint64_t    journalValidSize = 0;      // good bytes of <db>.journal, 0 = none (flushMutex)
++    uint64_t    baseSize         = 0;      // identity of the file the journal
++    uint64_t    baseTailHash     = 0;      // extends (flushMutex)
++
+     /// Loads all data from current stream into memory.
+     void load(std::istream &is, bool ignoreCorrupted);
+     /// Save the current in-memory data to the opened file.
+     void save(std::ostream &os) noexcept;
+     /// Writes the whole map to `path`. Caller holds at least a shared lock.
+     bool writeFile(const std::filesystem::path &path) noexcept;
++    /// flush()/compact(). Caller holds nothing.
++    bool flushImpl(bool compact) noexcept;
++    /// Rewrites the whole file (atomic, non-blocking) and resets the journal.
++    /// Caller holds flushMutex.
++    bool fullSave() noexcept;
++
++    // Journal. Caller holds flushMutex (or is the constructor).
++    std::filesystem::path journalPath() const;
++    static bool fileIdentity(const std::filesystem::path &path, uint64_t &size, uint64_t &hash);
++    void        replayJournal();
++    bool        appendJournal(const std::string &buf, uint32_t ops);
++    bool        resetJournal();
++    // Record one change into journalBuf. Caller holds the unique lock.
++    void journalPut(const DBKey &key, const DBRecord &record);
++    void journalDel(const DBKey &key);
+     /// Apply one write to the map. Caller holds the unique lock.
+     void applyLocked(const DBKey &key, const DBRecord &record, DBRecordMask mask, bool isDelete);
+ 
+@@ -251,9 +280,17 @@ private:
+     /// Folds the overlay into the sorted main table and drops deleted entries
+     /// (their arena bytes stay until the next load). Caller holds the unique lock.
+     void mergeOverlay();
+-    /// Writes one record in the yixindb layout.
++    /// Writes one key / record body / record in the yixindb layout.
++    template <typename Put, typename Key>
++    static void putKey(Put &put, const Key &key);
++    template <typename Put>
++    static void putBody(Put &put, const DBRecord &record);
+     template <typename Put, typename Key>
+-    static void putRecord(Put &put, const Key &key, const DBRecord &record);
++    static void putRecord(Put &put, const Key &key, const DBRecord &record)
++    {
++        putKey(put, key);
++        putBody(put, record);
++    }
+ };
+ 
+ }  // namespace Database

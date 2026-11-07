@@ -1,16 +1,16 @@
 engine     : Rapfi on-device (arm64-v8a)
 upstream   : 3c94c2a976f24a0dd1c5517623e9ab6fffe66bd7  (dhbloo/rapfi, 패치 전)
-patches    : 안드로이드 빌드 패치 2개(스크립트 [4/7]) + k1-neon-vqdmulh + k2-neon-starblock-multi + k3-a4-policy-cache + r4-p2-2-keep-evaluators-on-rebuild + r4-p4-1-periodic-node-stats + k7-codebook-prefetch-early + db1-atomic-nonblocking-save + db2-usedatabase-guard + db4-async-save (tools/patches/*.patch)
-source     : https://github.com/lowqen/rapfi 브랜치 android = 451a92b — 위 커밋 + 같은 패치를 커밋 하나씩, android/ 에 PGO 프로필 · 빌드 옵션. GPL 대응 소스(다음 릴리스 때 태그 zenyth-v<버전>)
-pgo        : dotprod 만 — tools/pgo/rapfi-dotprod.profdata (-fprofile-use, 2026-10-27 학습 그대로). DB1 · DB2 · DB4 가 바꾼 DB · 프로토콜 함수 9개만 프로필이 버려지고(hash mismatch 경고) 탐색 함수는 그대로 적용. NEON 은 PGO 없음
+patches    : 안드로이드 빌드 패치 2개(스크립트 [4/7]) + k1-neon-vqdmulh + k2-neon-starblock-multi + k3-a4-policy-cache + r4-p2-2-keep-evaluators-on-rebuild + r4-p4-1-periodic-node-stats + k7-codebook-prefetch-early + db1-atomic-nonblocking-save + db2-usedatabase-guard + db4-async-save + db5-compact-record-table + db6-differential-save-journal (tools/patches/*.patch)
+source     : https://github.com/lowqen/rapfi 브랜치 android = 2883aa3 — 위 커밋 + 같은 패치를 커밋 하나씩, android/ 에 PGO 프로필 · 빌드 옵션. GPL 대응 소스(다음 릴리스 때 태그 zenyth-v<버전>)
+pgo        : dotprod 만 — tools/pgo/rapfi-dotprod.profdata (-fprofile-use, 2026-10-27 학습 그대로). DB1 · DB2 · DB4 · DB5 · DB6 이 바꾼 DB · 프로토콜 함수 13개만 프로필이 버려지고(hash mismatch 경고) 탐색 함수는 그대로 적용. NEON 은 PGO 없음
 networks   : e32ad77a5364363b3e3a02b3f9e8610ade19ea98
 ndk        : r27c (windows-x86_64 프리빌트 — 스크립트 [3/7]~[6/7] 과 같은 커밋 · 같은 옵션)
 abi        : arm64-v8a / android-26 / c++_static / 16KB-page ready
 cmake opts : -DUSE_NEON=ON -DUSE_NEON_DOTPROD=OFF|ON -DNO_COMMAND_MODULES=ON -DENABLE_LTO=ON -DCMAKE_BUILD_TYPE=Release
 binaries   : libengine.so (NEON, armv8-a+simd) / libengine_dotprod.so (armv8.2-a+dotprod)
-size       : 1496400 / 1436624 bytes (stripped)
-built_at   : 2026-11-07 (같은 도구로 직전 탑재본을 다시 빌드해 build id 20바이트 말고 두 파일 모두 같음을 먼저 확인)
-bench(host): Hash: e240ab16  <- 폰의 BENCH Hash 가 이 값과 같아야 한다 (K1 · K2 · K3 · R4 · K7 · K6 PGO · DB1/2/4 는 결과 불변 — DB 사슬의 호스트 빌드로 확인)
-bench(phone): 이 빌드는 폰에서 아직 재지 않았다(DB 저장 경로만 바뀜). 직전 탑재본(2026-10-27): Galaxy A16 (MT6789) cpu7 A76, 1 스레드 BENCH(모두 e240ab16) dotprod 65,063 · 66,462 · 66,297, NEON 45,418 · 45,211
+size       : 1529520 / 1498864 bytes (stripped)
+built_at   : 2026-11-08 (2026-11-07 탑재본과 같은 도구 · 같은 옵션, 소스만 DB5 · DB6 추가)
+bench(host): Hash: e240ab16  <- 폰의 BENCH Hash 가 이 값과 같아야 한다 (K1 · K2 · K3 · R4 · K7 · K6 PGO · DB1/2/4/5/6 은 결과 불변 — DB 사슬(DB6 까지)의 호스트 빌드로 확인)
+bench(phone): 이 빌드는 폰에서 아직 재지 않았다(DB 메모리 표현 · 저장 경로만 바뀜). 직전 탑재본(2026-10-27): Galaxy A16 (MT6789) cpu7 A76, 1 스레드 BENCH(모두 e240ab16) dotprod 65,063 · 66,462 · 66,297, NEON 45,418 · 45,211
              R4 P2-2: 스레드 4 → 2 → 6 으로 세 번 탐색할 때 가중치 적재 2회(직전 6회). ARM CI(N2, PGO 없음) 같은 트리 +2.14 · +4.52% — docs/engineering-notes.md §1 R4 절
 build_by   : Zenyth/tools/build_engine_android.sh

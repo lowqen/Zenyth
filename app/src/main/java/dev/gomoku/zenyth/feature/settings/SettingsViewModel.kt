@@ -83,7 +83,9 @@ class SettingsViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.IO) {
             val db = File(localEngine.engineDir, LOCAL_DB_NAME)
-            val bytes = db.takeIf { it.isFile }?.length()
+            // The engine journals saves into `rapfi.db.journal` (DB6) until it folds them in.
+            val journal = File(localEngine.engineDir, "$LOCAL_DB_NAME.journal")
+            val bytes = db.takeIf { it.isFile }?.let { it.length() + journal.length() }
             val warn = MemoryTier.databaseWarnBytes(localEngineStore.totalRamMb)
             _state.update { it.copy(localDbBytes = bytes, localDbWarnBytes = warn) }
         }

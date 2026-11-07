@@ -32,9 +32,11 @@ NETWORKS_COMMIT="e32ad77a5364363b3e3a02b3f9e8610ade19ea98"  # dhbloo/rapfi-netwo
 #                                       멈추거나 명령을 막지 않는다 (Zenyth Web DB1, 탐색 결과 불변)
 #   db2-usedatabase-guard.patch : INFO USEDATABASE 1 이 이미 붙은 DB 를 다시 읽지 않는다 (Zenyth Web DB2)
 #   db4-async-save.patch : YXSAVEDATABASE 를 백그라운드 스레드에서 — 곧바로 돌아오고 끝나면 'Saved database file' (Zenyth Web DB4)
+#   db5-compact-record-table.patch : yixindb 기록을 정렬된 20바이트 항목 표로 — 파일 · 답 그대로, 메모리 1/3 · 읽기 · 저장 2배 빠름 (Zenyth Web DB5)
+#   db6-differential-save-journal.patch : journal = true 면 저장이 바뀐 기록만 <db>.journal 에 덧붙인다 · YXCOMPACTDATABASE (Zenyth Web DB6)
 #   (db3 빠른 LZ4 는 뺐다 — 파일이 79→110MB 로 커진다. docs: gomoku-dev test-yixin/docs/DB_IO_개선_계획.md)
 # 같은 사슬이 lowqen/rapfi 의 android 브랜치에 커밋 하나씩 있다(GPL 대응 소스 — docs/publishing.md §0).
-RAPFI_PATCHES="k1-neon-vqdmulh.patch k2-neon-starblock-multi.patch k3-a4-policy-cache.patch r4-p2-2-keep-evaluators-on-rebuild.patch r4-p4-1-periodic-node-stats.patch k7-codebook-prefetch-early.patch db1-atomic-nonblocking-save.patch db2-usedatabase-guard.patch db4-async-save.patch"
+RAPFI_PATCHES="k1-neon-vqdmulh.patch k2-neon-starblock-multi.patch k3-a4-policy-cache.patch r4-p2-2-keep-evaluators-on-rebuild.patch r4-p4-1-periodic-node-stats.patch k7-codebook-prefetch-early.patch db1-atomic-nonblocking-save.patch db2-usedatabase-guard.patch db4-async-save.patch db5-compact-record-table.patch db6-differential-save-journal.patch"
 PATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/patches"
 
 # K6 PGO — tools/pgo/rapfi-<변형>.profdata 는 위 커밋 + 위 패치로 만든 계측 빌드를 갤럭시 A16 에서

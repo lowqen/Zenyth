@@ -104,6 +104,11 @@ type = "yixindb"
 url = "rapfi.db"
 
 [database.yixindb]
+# Save only the changed records to <db>.journal; fold them into the file past
+# journal_compact_percent of its size or on YXCOMPACTDATABASE (Zenyth DB6)
+# 只把改动的记录追加到 <db>.journal，超过文件大小的一定比例时再合并
+journal = true
+
 # Save using the compressed format
 # 数据库是否采用压缩格式保存 (非压缩格式下保存的数据库可以使用Yixin打开)
 compressed_save = true
