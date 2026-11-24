@@ -16,6 +16,10 @@ import dev.gomoku.zenyth.core.model.Move
  *   the library's stats must come out the same on every device.
  *
  * Cell = `(x shl 5) or y` (boards up to 32), which sorts like the (x, y) bytes.
+ *
+ * - Rule · board salt (L5-0, 2026-11-24): a hash starts from
+ *   [ruleSalt] instead of 0, so a mixed-rule file does not merge equal stones
+ *   of different rules into one position. Stats carry [YxdbIndex.INDEX_VERSION].
  */
 object YxdbKey {
     const val MAX_BOARD = 32
@@ -94,6 +98,26 @@ object YxdbKey {
     }
 
     private val HEX = "0123456789abcdef".toCharArray()
+
+    private val saltCache = HashMap<Int, Long>()
+
+    /**
+     * The hash start for (rule, board size) — one splitmix64 step from
+     * `"RULE" shl 16 or rule shl 8 or w` (web `ruleSalt`). The same value in all
+     * 8 transforms, so canonical and parent hashes still agree, while equal
+     * stones under renju · standard · freestyle (or another board) stay apart.
+     */
+    @Synchronized
+    fun ruleSalt(rule: Int, w: Int): Long {
+        val k = ((rule and 0xff) shl 8) or (w and 0xff)
+        return saltCache.getOrPut(k) {
+            var z = (0x52554c45L shl 16) or k.toLong()
+            z += -0x61c8864680b583ebL                         // 0x9e3779b97f4a7c15
+            z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L    // 0xbf58476d1ce4e5b9
+            z = (z xor (z ushr 27)) * -0x6b2fb644ecceee15L    // 0x94d049bb133111eb
+            z xor (z ushr 31)
+        }
+    }
 
     /** Key bytes → stones (a pass slot ends its section). Null when malformed. */
     fun decode(b: ByteArray): DecodedKey? {
@@ -204,7 +228,8 @@ class KeyHasher {
         if (bw == 0 || bw > YxdbKey.MAX_BOARD || (b[off + 2].toInt() and 0xff) != bw) return false
         val count = (len - 3) shr 1
         val c = cells
-        var lcp = if (bw == w) preValid else 0
+        // Another rule or board starts from another salt.
+        var lcp = if (bw == w && (b[off].toInt() and 0xff) == rule) preValid else 0
         var p = off + 3
         for (i in 0 until count) {
             val x = b[p].toInt() and 0xff
@@ -241,6 +266,12 @@ class KeyHasher {
         val count = n
         val black = nb
         var i = preValid
+        if (i == 0) {
+            val salt = YxdbKey.ruleSalt(rule, w)
+            val sh = (salt ushr 32).toInt()
+            val sl = salt.toInt()
+            for (t in 0 until 16 step 2) { pr[t] = sh; pr[t + 1] = sl }
+        }
         var o = i * 16
         while (i < count) {
             val z = ((if (i < black) 0 else YxdbKey.CELLS) + c[i]) * 16

@@ -55,7 +55,15 @@ data class DbStats(
     val openings: List<Long>? = null,
     /** Parentless positions, largest subtree first. Absent when the index was skipped. */
     val roots: List<DbRoot>? = null,
-)
+    /** The index version that counted these ([YxdbIndex.INDEX_VERSION]); absent = 1 (no rule salt). */
+    val indexVersion: Int? = null,
+) {
+    /**
+     * Trustworthy under the current index — an older version is still exact
+     * when the file holds one rule · board only (web `statsCurrent`).
+     */
+    val current: Boolean get() = indexVersion == YxdbIndex.INDEX_VERSION || rules.size <= 1
+}
 
 enum class ScanPhase { STATS, HASH, LINK, ROOTS }
 
@@ -89,6 +97,12 @@ fun interface ClassifiedFn {
 }
 
 object YxdbIndex {
+    /**
+     * 2 = rule · board salt in the hash (L5-0). Version 1 merged equal stones of
+     * different rules, so only mixed-rule stats of version 1 are recounted.
+     */
+    const val INDEX_VERSION = 2
+
     const val BYTES_PER_RECORD = 16
     const val UNCLASSIFIED = Opening26.NONSTD // 26
     private const val ROOT_KEY_CAP = 8 shl 20
@@ -242,7 +256,7 @@ object YxdbIndex {
 
         if (ix == null) {
             return ScanResult(
-                DbStats(positions, rules, labels, commented), r1.count, r1.compressed, r1.rawBytes,
+                DbStats(positions, rules, labels, commented, indexVersion = INDEX_VERSION), r1.count, r1.compressed, r1.rawBytes,
                 sorted, duplicates, countOrdered, special, indexSkipped, false, null, ms,
                 (System.nanoTime() - t0) / 1_000_000,
             )
@@ -390,7 +404,7 @@ object YxdbIndex {
         ms[ScanPhase.ROOTS] = (tEnd - tLink) / 1_000_000
         ix.release()
         return ScanResult(
-            DbStats(positions, rules, labels, commented, openings, roots), r1.count, r1.compressed, r1.rawBytes,
+            DbStats(positions, rules, labels, commented, openings, roots, INDEX_VERSION), r1.count, r1.compressed, r1.rawBytes,
             sorted, duplicates, countOrdered, special, null, !countOrdered, indexBytes, ms,
             (tEnd - t0) / 1_000_000,
         )

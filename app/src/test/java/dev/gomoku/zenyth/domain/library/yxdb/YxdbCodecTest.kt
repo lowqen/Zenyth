@@ -178,6 +178,30 @@ class YxdbCodecTest {
     }
 
     @Test
+    fun ruleSaltKeepsRulesApart() {
+        // The web's yxdbfile.test.ts pins the same vector.
+        assertThat(Fingerprint.hex16(YxdbKey.ruleSalt(Yxdb.RULE_RENJU, 15))).isEqualTo("f8e1fdffa82a22c5")
+        val moves = listOf(Move(7, 7), Move(8, 6), Move(9, 9))
+        val h = KeyHasher()
+        val seen = listOf(2 to 15, 1 to 15, 0 to 15, 0 to 20, 2 to 15).map { (rule, w) ->
+            val k = YxdbKey.keyOfMoves(rule, w, moves)
+            check(h.load(k, 0, k.size)); h.hash(); h.canon()
+            h.hi to h.lo
+        }
+        assertThat(seen.toSet()).hasSize(4)
+        assertThat(seen[4]).isEqualTo(seen[0]) // same after prefix reuse
+    }
+
+    @Test
+    fun oldStatsAreCurrentOnlyForOneRule() {
+        val one = DbStats(3, mapOf("renju-15" to 3L), DbLabels(0, 0, 0, 0), 0)
+        assertThat(one.current).isTrue()
+        val mixed = one.copy(rules = mapOf("renju-15" to 2L, "standard-15" to 1L))
+        assertThat(mixed.current).isFalse()
+        assertThat(mixed.copy(indexVersion = YxdbIndex.INDEX_VERSION).current).isTrue()
+    }
+
+    @Test
     fun keyHexRoundTripAndDecode() {
         val k = key(Opening26.representative(0))
         val back = YxdbKey.fromHex(YxdbKey.toHex(k))
