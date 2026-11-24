@@ -169,6 +169,23 @@ class YxdbMergeTest {
     }
 
     @Test
+    fun duplicatesWithinAnInputAreOnePosition() {
+        val dup = dbOf(listOf(meta, Rec(k, v('l', 2, "하나")), Rec(k, v('w', 5, "둘"))))
+        val (out, sum) = merge(src(listOf(dup, oa)))
+        assertThat(sum.records).isEqualTo(2)
+        assertThat(sum.positions).isEqualTo(1)
+        assertThat(sum.overlaps).isEqualTo(1)
+        assertThat(sum.inputPositions).containsExactly(1L, 1L).inOrder()
+        // Deepest wins; comments in rank order, within a rank as they came.
+        assertThat(valueOf(out)).isEqualTo(YxdbKey.toHex(v('w', 5, "하나\n둘\n가")))
+        // Alone, too (no other input to tie with).
+        val (solo, s1) = merge(src(listOf(dup)))
+        assertThat(s1.positions).isEqualTo(1)
+        assertThat(s1.overlaps).isEqualTo(0)
+        assertThat(valueOf(solo)).isEqualTo(YxdbKey.toHex(v('w', 5, "하나\n둘")))
+    }
+
+    @Test
     fun unorderedInputThrowsAndSortedRunsMerge() {
         val bad = dbOf(listOf(recs[0]) + recs.drop(1).reversed())
         val e = assertThrows(YxdbUnsorted::class.java) { YxdbMerge.merge(src(listOf(original, bad)), deeper) }

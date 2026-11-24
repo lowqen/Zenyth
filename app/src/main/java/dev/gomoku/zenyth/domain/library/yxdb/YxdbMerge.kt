@@ -64,6 +64,9 @@ class YxdbCursor(
     /** A key smaller than the one before came up ([checkOrder]). */
     var unsorted = false
         private set
+    /** With [checkOrder]: sign of compare(previous key, this key) — 0 = a duplicate of the previous; -1 for the first. */
+    var order = -1
+        private set
 
     private var offs = IntArray(4 * 1024)
     private var n = 0
@@ -142,7 +145,10 @@ class YxdbCursor(
         keyLen = offs[o + 1]
         valOff = offs[o + 2]
         valLen = offs[o + 3]
-        if (checkOrder && trail.next(buf, keyOff, keyLen) > 0) unsorted = true
+        if (checkOrder) {
+            order = trail.next(buf, keyOff, keyLen)
+            if (order > 0) unsorted = true
+        }
         return true
     }
 
@@ -334,39 +340,53 @@ object YxdbMerge {
                 opts.onProgress?.invoke(JobProgress(phase, if (force) 1.0 else minOf(1.0, loaded.toDouble() / total), positions))
             }
 
+            val cur = cursors.toTypedArray()
+            val rankOf = IntArray(cur.size) { sources[it].rank }
+            val tied = BooleanArray(cur.size)
             var step = 0L
             while (true) {
-                // The smallest head — few inputs, so a plain scan.
+                // The smallest head and every head equal to it, in one scan (k − 1 compares).
                 var m = -1
-                for (j in cursors.indices) {
+                for (j in cur.indices) {
                     if (!alive[j]) continue
                     if (m < 0) {
                         m = j
+                        tied[j] = true
                         continue
                     }
-                    val a = cursors[j]
-                    val b = cursors[m]
+                    val a = cur[j]
+                    val b = cur[m]
                     val c = Yxdb.compareKeys(a.buf, a.keyOff, a.keyLen, b.buf, b.keyOff, b.keyLen)
-                    if (c < 0 || (c == 0 && sources[j].rank < sources[m].rank)) m = j
+                    if (c < 0) {
+                        for (t in 0 until j) tied[t] = false
+                        m = j
+                        tied[j] = true
+                    } else if (c == 0) {
+                        tied[j] = true
+                        if (rankOf[j] < rankOf[m]) m = j
+                    }
                 }
                 if (m < 0) break
-                val cm = cursors[m]
+                val cm = cur[m]
                 val kl = cm.keyLen
                 System.arraycopy(cm.buf, cm.keyOff, key, 0, kl)
                 vn = 0
                 seenRank.fill(false)
                 var vlen = 0
-                // Gather every head with this key (duplicates within an input too).
-                for (j in cursors.indices) {
-                    val c = cursors[j]
-                    while (alive[j] && Yxdb.compareKeys(c.buf, c.keyOff, c.keyLen, key, 0, kl) == 0) {
+                // Gather the tied heads; a cursor's own order check spots duplicates within an input.
+                for (j in cur.indices) {
+                    if (!tied[j]) continue
+                    tied[j] = false
+                    val c = cur[j]
+                    var more = true
+                    while (more) {
                         if (vlen + c.valLen > vals.size) vals = vals.copyOf(maxOf(vlen + c.valLen, vals.size * 2))
                         System.arraycopy(c.buf, c.valOff, vals, vlen, c.valLen)
                         if (vn == vOff.size) {
                             vOff = vOff.copyOf(vn * 2); vLen = vLen.copyOf(vn * 2); vRank = vRank.copyOf(vn * 2)
                         }
                         // Insert in rank order.
-                        val r = sources[j].rank
+                        val r = rankOf[j]
                         var at = vn
                         while (at > 0 && vRank[at - 1] > r) {
                             vOff[at] = vOff[at - 1]; vLen[at] = vLen[at - 1]; vRank[at] = vRank[at - 1]
@@ -378,6 +398,7 @@ object YxdbMerge {
                         seenRank[r] = true
                         alive[j] = c.next()
                         if (c.unsorted) throw YxdbUnsorted(r)
+                        more = alive[j] && c.order == 0
                     }
                 }
                 val meta = Yxdb.isMetaKey(key, 0, kl)
