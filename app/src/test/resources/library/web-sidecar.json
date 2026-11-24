@@ -1,0 +1,115 @@
+{
+ "version": 1,
+ "app": "zenyth",
+ "entries": [
+  {
+   "id": "0b6f6a3e-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+   "file": "화월 연구.db",
+   "title": "화월 \"연구\"\n둘째 줄 😀",
+   "cover": {
+    "mode": "opening",
+    "opening": 3,
+    "seed": 17,
+    "tint": 2
+   },
+   "fingerprint": {
+    "size": 1234567,
+    "mtime": 1800000000000,
+    "tail": "0123456789abcdef"
+   },
+   "stats": {
+    "records": 485,
+    "rules": {
+     "renju-15": 442,
+     "freestyle-15": 27
+    },
+    "labels": {
+     "W": 3,
+     "L": 2,
+     "D": 1,
+     "other": 479
+    },
+    "commented": 4,
+    "openings": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "roots": [
+     {
+      "key": "0f0f0207",
+      "subtree": 414
+     }
+    ],
+    "indexVersion": 2,
+    "futureStat": {
+     "a": []
+    }
+   },
+   "createdAt": 1700000000000,
+   "updatedAt": 1800000000001,
+   "lastOpenedAt": 1800000000002,
+   "pinned": true,
+   "tags": []
+  },
+  {
+   "id": "1a2b3c4d-0000-4000-8000-000000000000",
+   "file": "새 DB.db",
+   "title": "새 DB",
+   "cover": {
+    "mode": "eclipse",
+    "seed": 0
+   },
+   "createdAt": 1700000000000,
+   "updatedAt": 1700000000000,
+   "futureObj": {}
+  },
+  {
+   "id": "2a2b3c4d-0000-4000-8000-000000000000",
+   "file": "gone.db",
+   "title": "tab\there \u0001",
+   "cover": {
+    "mode": "auto",
+    "seed": 2147483646
+   },
+   "fingerprint": {
+    "size": 7,
+    "mtime": 1,
+    "tail": "ffffffffffffffff"
+   },
+   "createdAt": 1750000000000,
+   "updatedAt": 1750000000000,
+   "missingSince": 1760000000000,
+   "trashedAt": 1770000000000,
+   "trashFile": "1770000000000-gone.db",
+   "fileRenamePending": "가 나.db"
+  }
+ ],
+ "future": {
+  "note": "kept"
+ }
+}

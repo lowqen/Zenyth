@@ -17,6 +17,32 @@ data class Fingerprint(val size: Long, val mtime: Long, val tail: String) {
             Fingerprint(size, mtime, hex16(Fnv1a64.of(tailBytes, off, len)))
 
         fun hex16(v: Long): String = java.lang.Long.toHexString(v).padStart(16, '0')
+
+        /**
+         * Reads only the tail of [input] (positioned at the start, [size] bytes
+         * long): skips to `size − 4096` — a seek for file streams, a read-skip
+         * for providers that cannot seek.
+         */
+        fun read(input: java.io.InputStream, size: Long, mtime: Long): Fingerprint {
+            var skip = maxOf(0L, size - TAIL_BYTES)
+            while (skip > 0) {
+                val n = input.skip(skip)
+                if (n > 0) {
+                    skip -= n
+                    continue
+                }
+                if (input.read() < 0) break
+                skip--
+            }
+            val buf = ByteArray(minOf(size, TAIL_BYTES.toLong()).toInt())
+            var len = 0
+            while (len < buf.size) {
+                val r = input.read(buf, len, buf.size - len)
+                if (r < 0) break
+                len += r
+            }
+            return of(size, mtime, buf, 0, len)
+        }
     }
 }
 

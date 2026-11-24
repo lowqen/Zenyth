@@ -51,6 +51,14 @@ class BackupRulesTest {
         }
     }
 
+    /** Library L5 §9-7: databases past the 25 MB quota would skip the whole cloud backup. */
+    @Test
+    fun `library databases stay out of the cloud but travel device to device`() {
+        assertThat(rules.toMap().getValue("cloud-backup")).contains("library")
+        assertThat(rules.toMap().getValue("full-backup-content")).contains("library")
+        assertThat(rules.toMap().getValue("device-transfer")).doesNotContain("library")
+    }
+
     /** RenjuNet's licence: nothing derived from it in any online system. */
     @Test
     fun `renjunet packs never reach the cloud`() {

@@ -3,7 +3,7 @@
   What Android 8 – 11 backs up — the same rules as data_extraction_rules.xml,
   whose comment says why each one is out. These versions use one set for cloud
   backup and device transfer alike, so packs/ (RenjuNet-derived, never online)
-  is left out of both.
+  is left out of both, and so is library/ (past the cloud quota).
 -->
 <full-backup-content>
     <exclude domain="file" path="engine/mix9svqfreestyle_bsmix.bin.lz4" />
@@ -16,4 +16,5 @@
     <exclude domain="file" path="engine/.dotprod-sigill" />
     <exclude domain="file" path="zenyth-debug.log" />
     <exclude domain="file" path="packs" />
+    <exclude domain="file" path="library" />
 </full-backup-content>

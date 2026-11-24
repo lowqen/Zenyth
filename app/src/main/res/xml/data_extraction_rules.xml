@@ -17,6 +17,12 @@
   online system. A cloud backup is one, so it stays out of cloud-backup; a
   device-to-device transfer is not, so it travels and spares a rebuild.
 
+  library/ (library L5, design §9-7) holds the user's databases, often far past
+  the 25 MB cloud quota — and a backup over the quota is skipped whole, settings
+  included. Its sidecar names files that would not come back, so the folder
+  stays out as one. Moving databases between devices goes through a folder
+  source (SAF) or device transfer, which keeps it.
+
   BackupRulesTest checks every file under assets/engine is listed here.
 -->
 <data-extraction-rules>
@@ -31,6 +37,7 @@
         <exclude domain="file" path="engine/.dotprod-sigill" />
         <exclude domain="file" path="zenyth-debug.log" />
         <exclude domain="file" path="packs" />
+        <exclude domain="file" path="library" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="engine/mix9svqfreestyle_bsmix.bin.lz4" />
