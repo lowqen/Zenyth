@@ -1,0 +1,73 @@
+package dev.gomoku.zenyth.domain.library.yxdb
+
+import com.google.common.truth.Truth.assertThat
+import dev.gomoku.zenyth.core.model.Move
+import dev.gomoku.zenyth.core.model.Opening26
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import org.junit.Test
+import java.io.ByteArrayInputStream
+
+/**
+ * Cross-implementation goldens (library L5 design §8). The files under
+ * `src/test/resources/library/` were written by the web codec
+ * (Zenyth-web `bench/dbio/l5-golden.ts`): synthetic yixindb files and what
+ * the web's `scanYxdb` made of them. Stats travel in the folder sidecar, so
+ * each app trusts the other's numbers only if both count the same way.
+ */
+class LibraryGoldenTest {
+
+    private fun resource(name: String): ByteArray =
+        checkNotNull(javaClass.classLoader!!.getResourceAsStream("library/$name")) { "missing library/$name" }
+            .use { it.readBytes() }
+
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private fun check(name: String) {
+        val db = resource("$name.db")
+        val golden = json.parseToJsonElement(resource("$name.json").decodeToString()).jsonObject
+        val r = YxdbIndex.scan({ ByteArrayInputStream(db) }, db.size.toLong())
+
+        val want = json.decodeFromJsonElement(DbStats.serializer(), golden.getValue("stats"))
+        assertThat(r.stats).isEqualTo(want)
+        // The sidecar text: same keys, same order of rules.
+        assertThat(r.stats.rules.keys.toList()).isEqualTo(want.rules.keys.toList())
+        assertThat(r.count).isEqualTo(golden.long("count"))
+        assertThat(r.compressed).isEqualTo(golden.bool("compressed"))
+        assertThat(r.sorted).isEqualTo(golden.bool("sorted"))
+        assertThat(r.duplicates).isEqualTo(golden.long("duplicates"))
+        assertThat(r.countOrdered).isEqualTo(golden.bool("countOrdered"))
+        assertThat(r.special).isEqualTo(golden.long("special"))
+        val skipped = golden["openingsSkipped"]?.jsonPrimitive?.contentOrNull
+        assertThat(r.openingsUnordered).isEqualTo(skipped == "unordered")
+    }
+
+    private fun JsonObject.long(k: String) = getValue(k).jsonPrimitive.long
+    private fun JsonObject.bool(k: String) = getValue(k).jsonPrimitive.boolean
+
+    @Test fun mixedRulesAndOpenings() = check("mixed")
+
+    @Test fun unorderedFileSkipsOpenings() = check("unordered")
+
+    @Test fun orphansBecomeRootsAndUnclassified() = check("orphans")
+
+    @Test
+    fun threeStoneClassificationMatchesTheWeb() {
+        val chars = "0123456789abcdefghijklmnopq"
+        val lines = resource("classify3.txt").decodeToString().trimEnd().lines()
+        assertThat(lines).hasSize(225)
+        var mismatches = 0
+        for (c in 0 until 225) for (d in 0 until 225) {
+            val want = lines[c][d]
+            if (want == '.') continue
+            val got = Opening26.classify(listOf(Move(7, 7), Move(c % 15, c / 15), Move(d % 15, d / 15)))
+            if (chars[got] != want) mismatches++
+        }
+        assertThat(mismatches).isEqualTo(0)
+    }
+}

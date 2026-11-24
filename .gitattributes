@@ -1,3 +1,7 @@
 # Run on Linux or on the phone (adb shell): CRLF breaks both sh and the piskvork BOARD lines.
 *.sh               text eol=lf
 tools/pgo/*.txt    text eol=lf
+# Library goldens: written by Zenyth-web bench/dbio/l5-golden.ts, compared byte for byte.
+app/src/test/resources/library/*.db   binary
+app/src/test/resources/library/*.txt  text eol=lf
+app/src/test/resources/library/*.json text eol=lf

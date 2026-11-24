@@ -1,0 +1,60 @@
+{
+ "stats": {
+  "records": 485,
+  "rules": {
+   "freestyle-15": 27,
+   "freestyle-20": 16,
+   "standard-15": 28,
+   "renju-15": 414
+  },
+  "labels": {
+   "W": 139,
+   "L": 70,
+   "D": 69,
+   "other": 69
+  },
+  "commented": 69,
+  "openings": [
+   13,
+   19,
+   26,
+   13,
+   16,
+   21,
+   8,
+   15,
+   30,
+   8,
+   17,
+   21,
+   8,
+   15,
+   26,
+   9,
+   27,
+   19,
+   10,
+   12,
+   27,
+   5,
+   16,
+   16,
+   6,
+   13,
+   17
+  ],
+  "roots": [
+   {
+    "key": "000f0f",
+    "subtree": 475
+   }
+  ]
+ },
+ "count": 486,
+ "compressed": true,
+ "sorted": true,
+ "duplicates": 0,
+ "countOrdered": true,
+ "special": 1,
+ "openingsSkipped": null
+}

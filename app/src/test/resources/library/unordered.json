@@ -1,0 +1,31 @@
+{
+ "stats": {
+  "records": 485,
+  "rules": {
+   "renju-15": 414,
+   "standard-15": 28,
+   "freestyle-15": 27,
+   "freestyle-20": 16
+  },
+  "labels": {
+   "W": 139,
+   "L": 70,
+   "D": 69,
+   "other": 69
+  },
+  "commented": 69,
+  "roots": [
+   {
+    "key": "020f0f",
+    "subtree": 475
+   }
+  ]
+ },
+ "count": 486,
+ "compressed": false,
+ "sorted": false,
+ "duplicates": 0,
+ "countOrdered": false,
+ "special": 1,
+ "openingsSkipped": "unordered"
+}
