@@ -201,6 +201,64 @@ class YxdbCodecTest {
         assertThat(mixed.copy(indexVersion = YxdbIndex.INDEX_VERSION).current).isTrue()
     }
 
+    /** Random keys: shared prefixes, other lengths · rules · boards, pass slots, short keys. */
+    private fun randomKeys(rnd: Random, n: Int): List<ByteArray> {
+        val out = ArrayList<ByteArray>()
+        var last = key(Opening26.representative(0))
+        repeat(n) {
+            val k = when (rnd.nextInt(8)) {
+                0 -> byteArrayOf(rnd.nextInt(3).toByte(), 15, 15) + rnd.nextBytes(2 * rnd.nextInt(6)).map { (it.toInt() and 15).toByte() }
+                1 -> last.copyOf(last.size + 2).also { it[it.size - 2] = rnd.nextInt(15).toByte(); it[it.size - 1] = rnd.nextInt(15).toByte() }
+                2 -> if (last.size > 5) last.copyOf(last.size - 2) else last.copyOf()
+                3 -> last.copyOf().also { if (it.size > 3) it[it.size - 1] = (-1).toByte(); if (it.size > 4) it[it.size - 2] = (-1).toByte() }
+                4 -> byteArrayOf(rnd.nextInt(3).toByte())
+                5 -> last.copyOf().also { it[0] = rnd.nextInt(3).toByte() }
+                else -> last.copyOf().also { if (it.size > 3) it[3 + rnd.nextInt(it.size - 3)] = rnd.nextInt(15).toByte() }
+            }
+            out.add(k)
+            last = k
+        }
+        return out
+    }
+
+    @Test
+    fun keyTrailAgreesWithCompareKeys() {
+        val keys = randomKeys(Random(3), 5000)
+        val t = KeyTrail()
+        val sign = { v: Int -> v.coerceIn(-1, 1) }
+        keys.forEachIndexed { i, k ->
+            val c = t.next(k, 0, k.size)
+            if (i == 0) return@forEachIndexed
+            val p = keys[i - 1]
+            assertThat(sign(c)).isEqualTo(sign(Yxdb.compareKeys(p, 0, p.size, k, 0, k.size)))
+            var m = 0
+            while (m < minOf(p.size, k.size) && p[m] == k[m]) m++
+            assertThat(t.common).isEqualTo(m)
+        }
+    }
+
+    @Test
+    fun parserCutsRecordsAcrossAnyChunking() {
+        val db = sampleDb(compress = false)
+        fun records(step: (Int) -> Int): List<String> {
+            val out = ArrayList<String>()
+            val p = YxdbRecordParser({ b, ko, kl, vo, vl, _ -> out.add(YxdbKey.toHex(b, ko, kl) + ":" + YxdbKey.toHex(b, vo, vl)); true })
+            var pos = 0
+            var i = 0
+            while (pos < db.size) {
+                val n = minOf(step(i++), db.size - pos)
+                p.push(db, pos, n)
+                pos += n
+            }
+            p.end()
+            return out
+        }
+        val whole = records { db.size }
+        assertThat(whole).hasSize(9)
+        for (s in listOf(1, 2, 3, 5, 7, 13)) assertThat(records { s }).isEqualTo(whole)
+        assertThat(records { it % 11 + 1 }).isEqualTo(whole)
+    }
+
     @Test
     fun keyHexRoundTripAndDecode() {
         val k = key(Opening26.representative(0))

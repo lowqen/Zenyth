@@ -82,10 +82,29 @@ class YxdbRecordParser(
             }
         }
         while (p < end) {
-            val want = wanted(buf, p, end - p)
-            if (end - p < want) {
-                System.arraycopy(buf, p, carry, 0, end - p)
-                carryLen = end - p
+            val avail = end - p
+            // Hot path: a whole record in the buffer — its lengths are read once.
+            if (count >= 0 && avail >= 4) {
+                val kl = u16(buf, p)
+                if (kl != 0 && avail >= kl + 4) {
+                    val vl = u16(buf, p + 2 + kl)
+                    val size = kl + 4 + vl
+                    if (avail >= size) {
+                        val i = index++
+                        if (!onRecord.record(buf, p + 2, kl, p + 4 + kl, vl, i.toInt())) stopped = true
+                        p += size
+                        if (done) {
+                            if (!stopped) trailing += end - p
+                            return
+                        }
+                        continue
+                    }
+                }
+            }
+            val want = wanted(buf, p, avail)
+            if (avail < want) {
+                System.arraycopy(buf, p, carry, 0, avail)
+                carryLen = avail
                 return
             }
             p += consume(buf, p)
@@ -262,7 +281,7 @@ object Yxdb {
     }
 
     /** Pass slots only sit at a section's end (engine `putRecord`). */
-    private fun hasPassSlot(b: ByteArray, o: Int, l: Int): Boolean {
+    internal fun hasPassSlot(b: ByteArray, o: Int, l: Int): Boolean {
         val slots = (l - 3) shr 1
         if (slots <= 0) return false
         val nb = (slots + 1) shr 1
@@ -385,5 +404,51 @@ class YxdbWriter(
         flush()
         enc?.finish()
         finished = true
+    }
+}
+
+/**
+ * The previous key of a stream — order · duplicates, and how many leading
+ * bytes the next key shares with it ([common]). Engine files are in key order,
+ * so neighbours share most leading stones (sample: 24 of 37): only the bytes
+ * after the shared part are compared again and copied, and callers can skip
+ * re-checking the shared slots. Same answer as [Yxdb.compareKeys].
+ */
+internal class KeyTrail {
+    private val prev = ByteArray(0x10000)
+    private var prevLen = -1
+    private var prevPass = false
+
+    /** Leading bytes the current key shares with the previous one (0 for the first). */
+    var common = 0
+        private set
+
+    /** Steps to the next key: the sign of compare(previous, this); -1 for the first key. */
+    fun next(b: ByteArray, ko: Int, kl: Int): Int {
+        val pl = prevLen
+        val pass = Yxdb.hasPassSlot(b, ko, kl)
+        if (pl < 0) {
+            System.arraycopy(b, ko, prev, 0, kl)
+            prevLen = kl
+            prevPass = pass
+            common = 0
+            return -1
+        }
+        val a = prev
+        val lim = minOf(pl, kl)
+        var m = 0
+        while (m < lim && a[m] == b[ko + m]) m++
+        val c = when {
+            m < 3 && m < lim -> (a[m].toInt() and 0xff) - (b[ko + m].toInt() and 0xff)
+            m < 3 || prevPass || pass -> Yxdb.compareKeys(a, 0, pl, b, ko, kl)
+            pl != kl -> pl - kl
+            m == kl -> 0
+            else -> (a[m].toInt() and 0xff) - (b[ko + m].toInt() and 0xff)
+        }
+        System.arraycopy(b, ko + m, a, m, kl - m)
+        prevLen = kl
+        prevPass = pass
+        common = m
+        return c
     }
 }

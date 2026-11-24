@@ -45,6 +45,14 @@ class LibraryGoldenTest {
         assertThat(r.special).isEqualTo(golden.long("special"))
         val skipped = golden["openingsSkipped"]?.jsonPrimitive?.contentOrNull
         assertThat(r.openingsUnordered).isEqualTo(skipped == "unordered")
+
+        // Stats alone (L5-1 fast path: shared slots unread) — the same numbers without openings · roots.
+        val s = YxdbIndex.scan({ ByteArrayInputStream(db) }, db.size.toLong(), index = false)
+        assertThat(s.stats).isEqualTo(want.copy(openings = null, roots = null))
+        assertThat(s.sorted).isEqualTo(r.sorted)
+        assertThat(s.duplicates).isEqualTo(r.duplicates)
+        assertThat(s.countOrdered).isEqualTo(r.countOrdered)
+        assertThat(s.special).isEqualTo(r.special)
     }
 
     private fun JsonObject.long(k: String) = getValue(k).jsonPrimitive.long

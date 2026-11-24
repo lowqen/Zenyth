@@ -155,73 +155,15 @@ object YxdbIndex {
         }
 
         // ── pass 1: stats (+ hashes) ──
-        var w = 0L; var l = 0L; var d = 0L; var other = 0L; var commented = 0L
-        val ruleCount = LinkedHashMap<Int, Long>() // first-seen order, like the web's Map
-        val lastN = HashMap<Int, Int>()
-        var curRk = -1
-        var curCount = 0L
-        var curN = -1
-        fun switchRule(rk: Int) {
-            if (curRk >= 0) {
-                ruleCount[curRk] = (ruleCount[curRk] ?: 0L) + curCount
-                lastN[curRk] = curN
-            }
-            curRk = rk
-            curCount = 0
-            curN = if (rk >= 0) lastN[rk] ?: -1 else -1
-        }
-        var countOrdered = true
-        var sorted = true
-        var duplicates = 0L
-        var special = 0L
-        val prev = ByteArray(0x10000)
-        var prevLen = -1
-        var idx: Index? = null
         var indexSkipped: IndexSkipped? = null
         val hasher = KeyHasher()
+        val p1 = Pass1(hasher)
         var phase1 = if (index) ScanPhase.HASH else ScanPhase.STATS
 
         val r1 = open().use { input ->
             Yxdb.read(
                 input, total,
-                onRecord = { b, ko, kl, vo, vl, _ ->
-                    if (prevLen >= 0) {
-                        val c = Yxdb.compareKeys(prev, 0, prevLen, b, ko, kl)
-                        if (c > 0) sorted = false else if (c == 0) duplicates++
-                    }
-                    System.arraycopy(b, ko, prev, 0, kl)
-                    prevLen = kl
-                    if (Yxdb.isMetaKey(b, ko, kl)) {
-                        special++
-                        return@read true
-                    }
-                    records++
-                    val rk = (b[ko].toInt() and 0xff) or ((b[ko + 1].toInt() and 0xff) shl 8) or
-                        ((b[ko + 2].toInt() and 0xff) shl 16)
-                    if (rk != curRk) switchRule(rk)
-                    curCount++
-                    when (Yxdb.valueLabel(b, vo, vl)) {
-                        0 -> Unit
-                        0x77 -> w++
-                        0x6c -> l++
-                        0x64 -> d++
-                        else -> other++
-                    }
-                    if (Yxdb.valueTextLength(vl) > 0) commented++
-                    if (!hasher.load(b, ko, kl)) {
-                        special++
-                        return@read true
-                    }
-                    if (hasher.n < curN) countOrdered = false
-                    curN = hasher.n
-                    val ix = idx
-                    if (ix != null) {
-                        hasher.hash()
-                        hasher.canon()
-                        ix.add(hasher.hi, hasher.lo, hasher.n)
-                    }
-                    true
-                },
+                onRecord = p1,
                 verify = verify,
                 onCount = { n ->
                     if (index) {
@@ -229,7 +171,7 @@ object YxdbIndex {
                             indexSkipped = IndexSkipped.MEMORY
                         } else {
                             try {
-                                idx = Index(n.toInt())
+                                p1.idx = Index(n.toInt())
                             } catch (_: OutOfMemoryError) {
                                 indexSkipped = IndexSkipped.ALLOC
                             }
@@ -240,18 +182,26 @@ object YxdbIndex {
                         }
                     }
                 },
-                onChunk = { loaded, tot -> if (tot > 0) progress(phase1, loaded.toDouble() / tot) },
+                onChunk = { loaded, tot ->
+                    records = p1.records
+                    if (tot > 0) progress(phase1, loaded.toDouble() / tot)
+                },
                 isCancelled = cancelled,
             )
         }
-        switchRule(-1)
-        val positions = records // pass 2 reuses `records` for progress only
+        p1.switchRule(-1)
+        val positions = p1.records // pass 2 reuses `records` for progress only
+        val sorted = p1.sorted
+        val duplicates = p1.duplicates
+        val countOrdered = p1.countOrdered
+        val special = p1.special
+        val commented = p1.commented
         val rules = LinkedHashMap<String, Long>()
-        for ((k, v) in ruleCount) rules[Yxdb.ruleBoardName(k and 0xff, (k ushr 8) and 0xff, (k ushr 16) and 0xff)] = v
-        val labels = DbLabels(w, l, d, other)
+        for ((k, v) in p1.ruleCount) rules[Yxdb.ruleBoardName(k and 0xff, (k ushr 8) and 0xff, (k ushr 16) and 0xff)] = v
+        val labels = DbLabels(p1.w, p1.l, p1.d, p1.other)
         val tStats = System.nanoTime()
         val ms = LinkedHashMap<ScanPhase, Long>()
-        val ix = idx
+        val ix = p1.idx
         ms[if (ix != null) ScanPhase.HASH else ScanPhase.STATS] = (tStats - t0) / 1_000_000
 
         if (ix == null) {
@@ -419,6 +369,123 @@ object YxdbIndex {
         val other = if (c0 == ctr) c1 else if (c1 == ctr) c0 else -1
         if (other < 0) return UNCLASSIFIED
         return Opening26.classify(listOf(Move(7, 7), Move(cw shr 5, cw and 31), Move(other shr 5, other and 31)))
+    }
+}
+
+/**
+ * Pass 1 per record — stats, order, and (with [idx]) hashes. Counters are
+ * fields, not captured locals, so the hot loop touches one object.
+ *
+ * Neighbouring keys share most of their slots ([KeyTrail.common]); those
+ * slots are neither compared, copied, nor re-checked for the board again —
+ * stats alone count stones from the key length after checking only the new
+ * slots (L5-1: the A16 stats pass was 5.9 s, over the 5 s goal). The results
+ * are the same as reading every slot: [special] and [countOrdered] still
+ * follow `KeyHasher.load`'s rules exactly.
+ */
+private class Pass1(private val hasher: KeyHasher) : YxdbRecordFn {
+    /** Set by `onCount` before the first record; null = stats only. */
+    var idx: Index? = null
+    private val trail = KeyTrail()
+    var records = 0L
+    var w = 0L
+    var l = 0L
+    var d = 0L
+    var other = 0L
+    var commented = 0L
+    var sorted = true
+    var duplicates = 0L
+    var special = 0L
+    var countOrdered = true
+    val ruleCount = LinkedHashMap<Int, Long>() // first-seen order, like the web's Map
+    private val lastN = HashMap<Int, Int>()
+    private var curRk = -1
+    private var curCount = 0L
+    private var curN = -1
+    /** The previous key was hashable — all its slots are on its board (and, with an index, in the hasher). */
+    private var prevOk = false
+
+    fun switchRule(rk: Int) {
+        if (curRk >= 0) {
+            ruleCount[curRk] = (ruleCount[curRk] ?: 0L) + curCount
+            lastN[curRk] = curN
+        }
+        curRk = rk
+        curCount = 0
+        curN = if (rk >= 0) lastN[rk] ?: -1 else -1
+    }
+
+    override fun record(buf: ByteArray, keyOff: Int, keyLen: Int, valOff: Int, valLen: Int, index: Int): Boolean {
+        val b = buf
+        val ko = keyOff
+        val kl = keyLen
+        val c = trail.next(b, ko, kl)
+        if (c > 0) sorted = false else if (c == 0) duplicates++
+        if (Yxdb.isMetaKey(b, ko, kl)) {
+            special++
+            prevOk = false
+            return true
+        }
+        records++
+        val rk = (b[ko].toInt() and 0xff) or ((b[ko + 1].toInt() and 0xff) shl 8) or
+            ((b[ko + 2].toInt() and 0xff) shl 16)
+        if (rk != curRk) switchRule(rk)
+        curCount++
+        if (valLen > 0) {
+            when (b[valOff].toInt() and 0xff) {
+                0 -> Unit
+                0x77 -> w++
+                0x6c -> l++
+                0x64 -> d++
+                else -> other++
+            }
+            if (valLen > 5) commented++
+        }
+        // Shared bytes past the 3-byte head cover the same rule · board and whole slots below this.
+        val common = trail.common
+        val known = if (prevOk && common >= 3) (common - 3) shr 1 else 0
+        val ix = idx
+        val n = if (ix == null) {
+            stoneCount(b, ko, kl, known)
+        } else if (hasher.load(b, ko, kl, known)) {
+            hasher.n
+        } else {
+            -1
+        }
+        if (n < 0) {
+            special++
+            prevOk = false
+            return true
+        }
+        prevOk = true
+        if (n < curN) countOrdered = false
+        curN = n
+        if (ix != null) {
+            hasher.hash()
+            hasher.canon()
+            ix.add(hasher.hi, hasher.lo, n)
+        }
+        return true
+    }
+
+    /**
+     * Stone count when hashable by `KeyHasher.load`'s rules (square, 1..32
+     * lines, no pass slot, on the board), else -1. Slots below [known] were
+     * checked with the previous key.
+     */
+    private fun stoneCount(b: ByteArray, ko: Int, kl: Int, known: Int): Int {
+        if (kl < 3 || (kl - 3) and 1 != 0) return -1
+        val bw = b[ko + 1].toInt() and 0xff
+        if (bw == 0 || bw > YxdbKey.MAX_BOARD || (b[ko + 2].toInt() and 0xff) != bw) return -1
+        val count = (kl - 3) shr 1
+        var p = ko + 3 + 2 * minOf(known, count)
+        val e = ko + kl
+        while (p < e) {
+            // Pass slots (0xFF) fail here too.
+            if ((b[p].toInt() and 0xff) >= bw || (b[p + 1].toInt() and 0xff) >= bw) return -1
+            p += 2
+        }
+        return count
     }
 }
 

@@ -221,8 +221,12 @@ class KeyHasher {
     /**
      * Loads a key. True when hashable (square, 1..32 lines, no pass slot,
      * coordinates on the board). Call [hash] separately.
+     *
+     * [known]: leading slots byte-equal to the previous key, which loaded
+     * successfully with the same rule and board (`KeyTrail.common`) — they are
+     * already in [cells] and on the board, so they are not read again.
      */
-    fun load(b: ByteArray, off: Int, len: Int): Boolean {
+    fun load(b: ByteArray, off: Int, len: Int, known: Int = 0): Boolean {
         if (len < 3 || (len - 3) and 1 != 0) return false
         val bw = b[off + 1].toInt() and 0xff
         if (bw == 0 || bw > YxdbKey.MAX_BOARD || (b[off + 2].toInt() and 0xff) != bw) return false
@@ -230,8 +234,9 @@ class KeyHasher {
         val c = cells
         // Another rule or board starts from another salt.
         var lcp = if (bw == w && (b[off].toInt() and 0xff) == rule) preValid else 0
-        var p = off + 3
-        for (i in 0 until count) {
+        val from = minOf(known, count)
+        var p = off + 3 + 2 * from
+        for (i in from until count) {
             val x = b[p].toInt() and 0xff
             val y = b[p + 1].toInt() and 0xff
             if (x >= bw || y >= bw) {

@@ -2,8 +2,19 @@ package dev.gomoku.zenyth.bench
 
 import dev.gomoku.zenyth.domain.library.yxdb.Lz4FrameDecoder
 import dev.gomoku.zenyth.domain.library.yxdb.Lz4Sink
+import dev.gomoku.zenyth.domain.library.yxdb.MergeOptions
+import dev.gomoku.zenyth.domain.library.yxdb.MergeOut
+import dev.gomoku.zenyth.domain.library.yxdb.MergePolicy
+import dev.gomoku.zenyth.domain.library.yxdb.MergeSource
+import dev.gomoku.zenyth.domain.library.yxdb.SplitBuckets
+import dev.gomoku.zenyth.domain.library.yxdb.SplitCriterion
+import dev.gomoku.zenyth.domain.library.yxdb.SplitOutput
+import dev.gomoku.zenyth.domain.library.yxdb.SplitPlan
 import dev.gomoku.zenyth.domain.library.yxdb.YxdbIndex
+import dev.gomoku.zenyth.domain.library.yxdb.YxdbInput
 import dev.gomoku.zenyth.domain.library.yxdb.YxdbKey
+import dev.gomoku.zenyth.domain.library.yxdb.YxdbMerge
+import dev.gomoku.zenyth.domain.library.yxdb.YxdbSplit
 import java.io.File
 import java.io.FileInputStream
 
@@ -17,8 +28,10 @@ import java.io.FileInputStream
  *     app_process /system/bin dev.gomoku.zenyth.bench.LibraryBench /data/local/tmp/sample.db'
  * ```
  *
- * Args: `<file> [rounds=2] [--no-index] [--budget-mb=N]`. Prints one block per
- * round (the first round includes JIT warm-up) plus peak RSS (VmHWM).
+ * Args: `<file> [rounds=2] [--no-index] [--budget-mb=N] [--codec]`. Prints one
+ * block per round (the first round includes JIT warm-up) plus peak RSS (VmHWM).
+ * `--codec` (L5-1) also times merge (the file with itself: preview · write) and
+ * split (solved: preview · write), writing to counting sinks only.
  */
 object LibraryBench {
     @JvmStatic
@@ -30,6 +43,7 @@ object LibraryBench {
         val file = File(path)
         val rounds = args.drop(1).firstOrNull { it.all(Char::isDigit) }?.toInt() ?: 2
         val index = "--no-index" !in args
+        val codec = "--codec" in args
         val budget = args.firstOrNull { it.startsWith("--budget-mb=") }
             ?.substringAfter('=')?.toLong()?.shl(20) ?: Long.MAX_VALUE
         val rt = Runtime.getRuntime()
@@ -73,9 +87,35 @@ object LibraryBench {
                     println("         root subtree ${r.subtree} · stones ${(k.size - 3) / 2}")
                 }
             }
+            if (codec) codecRound(file)
             println("rss peak ${vmHwm()} · heap used ${(rt.totalMemory() - rt.freeMemory()) shr 20} MB")
             System.gc()
         }
+    }
+
+    /** Merge · split on the file, output counted and dropped. */
+    private fun codecRound(file: File) {
+        val input = YxdbInput.of(file)
+        val sources = listOf(MergeSource(input, 0), MergeSource(input, 1))
+        val opts = MergeOptions(MergePolicy.DEEPER, joinComments = true)
+        var t = System.nanoTime()
+        val pre = YxdbMerge.merge(sources, opts)
+        val preMs = (System.nanoTime() - t) / 1_000_000
+        var out = 0L
+        t = System.nanoTime()
+        YxdbMerge.merge(sources, opts, MergeOut(pre.records, { _, _, l -> out += l }))
+        val writeMs = (System.nanoTime() - t) / 1_000_000
+        println("merge    preview ${preMs} ms · write ${writeMs} ms (x2 inputs) · positions ${pre.positions} · overlaps ${pre.overlaps} · out ${out shr 20} MB")
+
+        t = System.nanoTime()
+        val c = YxdbSplit.count(input, null, withOpenings = false)
+        val countMs = (System.nanoTime() - t) / 1_000_000
+        val plan = SplitPlan(SplitCriterion.SOLVED, listOf(SplitOutput(listOf(SplitBuckets.SOLVED), c.solved)), rest = c.total - c.solved)
+        val sizes = LongArray(2)
+        t = System.nanoTime()
+        YxdbSplit.run(input, plan, listOf({ _, _, l -> sizes[0] += l.toLong() }, { _, _, l -> sizes[1] += l.toLong() }), c.meta)
+        val runMs = (System.nanoTime() - t) / 1_000_000
+        println("split    preview ${countMs} ms · write ${runMs} ms · solved ${c.solved} / ${c.total} · out ${sizes[0] shr 20} + ${sizes[1] shr 20} MB")
     }
 
     private fun vmHwm(): String =
