@@ -32,6 +32,8 @@ import java.io.FileInputStream
  * block per round (the first round includes JIT warm-up) plus peak RSS (VmHWM).
  * `--codec` (L5-1) also times merge (the file with itself: preview · write) and
  * split (solved: preview · write), writing to counting sinks only.
+ * `--codec-out=DIR` writes those results to `DIR/l5merged.db` · `l5solved.db` ·
+ * `l5rest.db` instead (last round only) — to read them back with the web codec.
  */
 object LibraryBench {
     @JvmStatic
@@ -44,6 +46,7 @@ object LibraryBench {
         val rounds = args.drop(1).firstOrNull { it.all(Char::isDigit) }?.toInt() ?: 2
         val index = "--no-index" !in args
         val codec = "--codec" in args
+        val codecOut = args.firstOrNull { it.startsWith("--codec-out=") }?.substringAfter('=')?.let(::File)
         val budget = args.firstOrNull { it.startsWith("--budget-mb=") }
             ?.substringAfter('=')?.toLong()?.shl(20) ?: Long.MAX_VALUE
         val rt = Runtime.getRuntime()
@@ -87,25 +90,32 @@ object LibraryBench {
                     println("         root subtree ${r.subtree} · stones ${(k.size - 3) / 2}")
                 }
             }
-            if (codec) codecRound(file)
+            if (codec) codecRound(file, codecOut?.takeIf { round == rounds })
             println("rss peak ${vmHwm()} · heap used ${(rt.totalMemory() - rt.freeMemory()) shr 20} MB")
             System.gc()
         }
     }
 
     /** Merge · split on the file, output counted and dropped. */
-    private fun codecRound(file: File) {
+    private fun codecRound(file: File, outDir: File?) {
+        fun sink(name: String, count: LongArray, i: Int): (ByteArray, Int, Int) -> Unit {
+            if (outDir == null) return { _, _, l -> count[i] += l.toLong() }
+            val s = java.io.BufferedOutputStream(java.io.FileOutputStream(File(outDir, name)), 1 shl 20)
+            opened += s
+            return { b, o, l -> s.write(b, o, l); count[i] += l.toLong() }
+        }
         val input = YxdbInput.of(file)
         val sources = listOf(MergeSource(input, 0), MergeSource(input, 1))
         val opts = MergeOptions(MergePolicy.DEEPER, joinComments = true)
         var t = System.nanoTime()
         val pre = YxdbMerge.merge(sources, opts)
         val preMs = (System.nanoTime() - t) / 1_000_000
-        var out = 0L
+        val out = LongArray(1)
         t = System.nanoTime()
-        YxdbMerge.merge(sources, opts, MergeOut(pre.records, { _, _, l -> out += l }))
+        YxdbMerge.merge(sources, opts, MergeOut(pre.records, sink("l5merged.db", out, 0)))
+        closeAll()
         val writeMs = (System.nanoTime() - t) / 1_000_000
-        println("merge    preview ${preMs} ms · write ${writeMs} ms (x2 inputs) · positions ${pre.positions} · overlaps ${pre.overlaps} · out ${out shr 20} MB")
+        println("merge    preview ${preMs} ms · write ${writeMs} ms (x2 inputs) · positions ${pre.positions} · overlaps ${pre.overlaps} · out ${out[0] shr 20} MB")
 
         t = System.nanoTime()
         val c = YxdbSplit.count(input, null, withOpenings = false)
@@ -113,9 +123,17 @@ object LibraryBench {
         val plan = SplitPlan(SplitCriterion.SOLVED, listOf(SplitOutput(listOf(SplitBuckets.SOLVED), c.solved)), rest = c.total - c.solved)
         val sizes = LongArray(2)
         t = System.nanoTime()
-        YxdbSplit.run(input, plan, listOf({ _, _, l -> sizes[0] += l.toLong() }, { _, _, l -> sizes[1] += l.toLong() }), c.meta)
+        YxdbSplit.run(input, plan, listOf(sink("l5solved.db", sizes, 0), sink("l5rest.db", sizes, 1)), c.meta)
+        closeAll()
         val runMs = (System.nanoTime() - t) / 1_000_000
         println("split    preview ${countMs} ms · write ${runMs} ms · solved ${c.solved} / ${c.total} · out ${sizes[0] shr 20} + ${sizes[1] shr 20} MB")
+    }
+
+    private val opened = ArrayList<java.io.Closeable>()
+
+    private fun closeAll() {
+        opened.forEach { it.close() }
+        opened.clear()
     }
 
     private fun vmHwm(): String =
