@@ -231,6 +231,7 @@ object YxdbIndex {
             )
         }
         switchRule(-1)
+        val positions = records // pass 2 reuses `records` for progress only
         val rules = LinkedHashMap<String, Long>()
         for ((k, v) in ruleCount) rules[Yxdb.ruleBoardName(k and 0xff, (k ushr 8) and 0xff, (k ushr 16) and 0xff)] = v
         val labels = DbLabels(w, l, d, other)
@@ -241,7 +242,7 @@ object YxdbIndex {
 
         if (ix == null) {
             return ScanResult(
-                DbStats(records, rules, labels, commented), r1.count, r1.compressed, r1.rawBytes,
+                DbStats(positions, rules, labels, commented), r1.count, r1.compressed, r1.rawBytes,
                 sorted, duplicates, countOrdered, special, indexSkipped, false, null, ms,
                 (System.nanoTime() - t0) / 1_000_000,
             )
@@ -389,7 +390,7 @@ object YxdbIndex {
         ms[ScanPhase.ROOTS] = (tEnd - tLink) / 1_000_000
         ix.release()
         return ScanResult(
-            DbStats(records, rules, labels, commented, openings, roots), r1.count, r1.compressed, r1.rawBytes,
+            DbStats(positions, rules, labels, commented, openings, roots), r1.count, r1.compressed, r1.rawBytes,
             sorted, duplicates, countOrdered, special, null, !countOrdered, indexBytes, ms,
             (tEnd - t0) / 1_000_000,
         )

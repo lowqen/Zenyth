@@ -133,7 +133,7 @@ class YxdbCodecTest {
             assertThat(o[13]).isEqualTo(2)  // I1
             assertThat(o[26]).isEqualTo(4)  // empty, 1 stone, two 2-stone positions
             assertThat(r.stats.roots!!.map { it.subtree }).containsExactly(8L)
-            assertThat(r.stats.roots!!.single().key).isEqualTo("020f0f") // the empty board
+            assertThat(r.stats.roots.single().key).isEqualTo("020f0f") // the empty board
         }
     }
 
