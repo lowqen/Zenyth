@@ -10,7 +10,7 @@ import org.junit.Test
 class ReconcilerTest {
 
     private val now = 1_800_000_000_000L
-    private val stats = JsonObject(mapOf("records" to JsonPrimitive(3)))
+    private val counted = JsonObject(mapOf("records" to JsonPrimitive(3)))
 
     private fun fp(size: Long, tail: String, mtime: Long = 1) = Fingerprint(size, mtime, tail)
     private fun file(name: String, size: Long, mtime: Long = 1) = FileStat(name, size, mtime)
@@ -44,17 +44,17 @@ class ReconcilerTest {
 
     @Test
     fun `unchanged file — no fingerprint read, nothing changed`() {
-        val r = run(listOf(entry("a", "a.db", fp(10, "t-10", 5), stats)), listOf(file("a.db", 10, 5), file("a.db.journal", 32)))
+        val r = run(listOf(entry("a", "a.db", fp(10, "t-10", 5), counted)), listOf(file("a.db", 10, 5), file("a.db.journal", 32)))
         assertThat(r.changed).isFalse()
         assertThat(r.asked).isEmpty()
         assertThat(r.rows).hasSize(1)
         assertThat(r.rows[0].id).isEqualTo("a")
-        assertThat(r.rows[0].statsJson).isEqualTo(stats)
+        assertThat(r.rows[0].statsJson).isEqualTo(counted)
     }
 
     @Test
     fun `changed by another program — new fingerprint, stats dropped`() {
-        val r = run(listOf(entry("a", "a.db", fp(10, "t-10", 5), stats)), listOf(file("a.db", 12, 9)))
+        val r = run(listOf(entry("a", "a.db", fp(10, "t-10", 5), counted)), listOf(file("a.db", 12, 9)))
         assertThat(r.changed).isTrue()
         assertThat(r.rows[0].fingerprint).isEqualTo(fp(12, "t-12", 9))
         assertThat(r.rows[0].statsJson).isNull()
@@ -62,20 +62,20 @@ class ReconcilerTest {
 
     @Test
     fun `only the time changed (a copy) — stats stay, time follows`() {
-        val r = run(listOf(entry("a", "a.db", fp(10, "t-10", 5), stats)), listOf(file("a.db", 10, 7)))
-        assertThat(r.rows[0].statsJson).isEqualTo(stats)
+        val r = run(listOf(entry("a", "a.db", fp(10, "t-10", 5), counted)), listOf(file("a.db", 10, 7)))
+        assertThat(r.rows[0].statsJson).isEqualTo(counted)
         assertThat(r.rows[0].fingerprint!!.mtime).isEqualTo(7)
     }
 
     @Test
     fun `renamed outside the app — matched again by fingerprint`() {
-        val r = run(listOf(entry("a", "old.db", fp(10, "t-10"), stats, title = "화월")), listOf(file("new.db", 10)))
+        val r = run(listOf(entry("a", "old.db", fp(10, "t-10"), counted, title = "화월")), listOf(file("new.db", 10)))
         assertThat(r.rows).hasSize(1)
         with(r.rows[0]) {
             assertThat(id).isEqualTo("a")
             assertThat(file).isEqualTo("new.db")
             assertThat(title).isEqualTo("화월")
-            assertThat(statsJson).isEqualTo(stats)
+            assertThat(statsJson).isEqualTo(counted)
             assertThat(missingSince).isNull()
         }
     }
