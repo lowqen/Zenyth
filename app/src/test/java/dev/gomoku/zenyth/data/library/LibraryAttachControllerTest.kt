@@ -200,7 +200,7 @@ class LibraryAttachControllerTest {
         val pathB = r.app.fileOf(b.file).absolutePath
         assertThat(out).isEqualTo(AttachOutcome.Attached(pathB, live = true))
         assertThat(r.engine.sent).containsExactly(
-            "yxcompactdatabase", "info usedatabase 0", "yxsetdatabase\n$pathB", "ABOUT",
+            "yxcompactdatabase", "INFO usedatabase 0", "yxsetdatabase\n$pathB", "ABOUT",
         ).inOrder()
         assertThat(r.engine.idles).isEqualTo(1)
         assertThat(r.store.attached()).isEqualTo(AttachedDb(b.id, "app", pathB))
@@ -250,7 +250,7 @@ class LibraryAttachControllerTest {
 
         r.controller.switchTo(r.app, b)
 
-        assertThat(r.engine.sent.first()).isEqualTo("info usedatabase 0")
+        assertThat(r.engine.sent.first()).isEqualTo("INFO usedatabase 0")
     }
 
     // ── staging ──────────────────────────────────────────────────────
@@ -360,18 +360,20 @@ class LibraryAttachControllerTest {
 
         assertThat(out).isInstanceOf(WriteBackOutcome.Conflict::class.java)
         out as WriteBackOutcome.Conflict
-        assertThat(out.name).isEqualTo("연구 (이 기기).db")
+        // tr() follows the runtime locale (Robolectric: English) — the rule, not the words
+        val copyTitle = LibraryAttachController.conflictTitle("연구")
+        assertThat(out.name).isEqualTo("$copyTitle.db")
         assertThat(r.tree.bytes("연구.db")).isEqualTo(pc) // nobody loses
-        assertThat(r.tree.bytes("연구 (이 기기).db")).isEqualTo(bytes(6000, seed = 3))
+        assertThat(r.tree.bytes("$copyTitle.db")).isEqualTo(bytes(6000, seed = 3))
         val entries = r.saf.readManifest().entries
         val copy = entries.single { it.id == out.entryId }
-        assertThat(copy.title).isEqualTo("연구 (이 기기)")
-        assertThat(copy.file).isEqualTo("연구 (이 기기).db")
+        assertThat(copy.title).isEqualTo(copyTitle)
+        assertThat(copy.file).isEqualTo("$copyTitle.db")
         assertThat(entries.single { it.id == e.id }.fingerprint).isEqualTo(e.fingerprint)
         // the engine's copy is now the new entry's
         assertThat(r.store.attached()!!.entryId).isEqualTo(out.entryId)
         val m = r.store.markForEntry(out.entryId)!!
-        assertThat(m.name).isEqualTo("연구 (이 기기).db")
+        assertThat(m.name).isEqualTo("$copyTitle.db")
         assertThat(m.dirty).isFalse()
         assertThat(r.store.markForEntry(e.id)).isNull()
     }
