@@ -122,6 +122,14 @@ object YxdbIndex {
     /**
      * Scans a file. [open] is called once per pass (2 or 3 times); [total] is
      * the file's byte size, for progress.
+     *
+     * Two-stage report (L5 design §2.3): when the index follows, [onStats] gets
+     * the pass-1 stats (no openings · roots) as soon as pass 1 ends, so a card
+     * shows its count and rules within seconds. [dropIndex] is checked between
+     * the index's steps and per chunk of pass 2: true releases the index and
+     * returns those stats with `indexSkipped = MEMORY` (memory pressure in the
+     * job process). Not for [onClassified] callers — they would have seen part
+     * of pass 2.
      */
     fun scan(
         open: () -> InputStream,
@@ -133,9 +141,12 @@ object YxdbIndex {
         onClassified: ClassifiedFn? = null,
         onProgress: ((ScanProgress) -> Unit)? = null,
         isCancelled: (() -> Boolean)? = null,
+        onStats: ((DbStats) -> Unit)? = null,
+        dropIndex: (() -> Boolean)? = null,
     ): ScanResult {
         val t0 = System.nanoTime()
         val cancelled = { isCancelled?.invoke() == true }
+        val dropped = { dropIndex?.invoke() == true }
         val span = HashMap<ScanPhase, DoubleArray>().apply {
             if (index) {
                 put(ScanPhase.STATS, doubleArrayOf(0.0, 1.0)); put(ScanPhase.HASH, doubleArrayOf(0.0, 0.45))
@@ -204,160 +215,182 @@ object YxdbIndex {
         val ix = p1.idx
         ms[if (ix != null) ScanPhase.HASH else ScanPhase.STATS] = (tStats - t0) / 1_000_000
 
-        if (ix == null) {
-            return ScanResult(
-                DbStats(positions, rules, labels, commented, indexVersion = INDEX_VERSION), r1.count, r1.compressed, r1.rawBytes,
-                sorted, duplicates, countOrdered, special, indexSkipped, false, null, ms,
-                (System.nanoTime() - t0) / 1_000_000,
-            )
-        }
+        val basic = DbStats(positions, rules, labels, commented, indexVersion = INDEX_VERSION)
+        fun statsOnly(skipped: IndexSkipped?) = ScanResult(
+            basic, r1.count, r1.compressed, r1.rawBytes,
+            sorted, duplicates, countOrdered, special, skipped, false, null, ms,
+            (System.nanoTime() - t0) / 1_000_000,
+        )
+        if (ix == null) return statsOnly(indexSkipped)
+        onStats?.invoke(basic)
         if (cancelled()) throw YxdbCancelled()
+        if (dropped()) {
+            ix.release()
+            return statsOnly(IndexSkipped.MEMORY)
+        }
         ix.sort()
         if (cancelled()) throw YxdbCancelled()
+        if (dropped()) {
+            ix.release()
+            return statsOnly(IndexSkipped.MEMORY)
+        }
         val indexBytes = ix.bytes
-
-        // ── pass 2: parents · openings (slots stand in for record numbers) ──
-        val parent = ix.parent
-        val rootKeys = HashMap<Int, String>()
-        var rootKeyBytes = 0L
-        var rootKeysDropped = false
-        val counts = LongArray(Opening26.COUNT + 1)
-        var classified = 0L
-        val qh = IntArray(1024)
-        val ql = IntArray(1024)
-        val qs = IntArray(1024)
-        records = 0
-        open().use { input ->
-            Yxdb.read(
-                input, total,
-                onRecord = { b, ko, kl, vo, vl, _ ->
-                    if (!hasher.load(b, ko, kl)) {
-                        onClassified?.classified(b, ko, kl, vo, vl, if (Yxdb.isMetaKey(b, ko, kl)) -1 else UNCLASSIFIED)
-                        return@read true
-                    }
-                    hasher.hash()
-                    hasher.canon()
-                    val own = ix.find(hasher.hi, hasher.lo)
-                    if (own < 0 || ix.visited(own)) {
-                        // The same position again — only the first counts.
-                        onClassified?.classified(b, ko, kl, vo, vl, if (own < 0) UNCLASSIFIED else ix.openingOf(own))
-                        return@read true
-                    }
-                    records++
-                    val cls = classifiable(hasher.rule, hasher.w) && countOrdered
-                    val n = hasher.n
-                    var first = -1
-                    var op = -1 // parents' opening: -1 none yet
-                    if (!cls || n <= 3) {
-                        // Roots and subtrees only need the first parent.
-                        var k = hasher.lastFrom
-                        val to = hasher.lastTo
-                        while (k < to && first < 0) {
-                            hasher.without(k)
-                            first = ix.find(hasher.hi, hasher.lo)
-                            k++
-                        }
-                    } else {
-                        // Every parent — gather candidates and look them up together (overlaps cache misses).
-                        var q = 0
-                        for (k in hasher.lastFrom until hasher.lastTo) {
-                            hasher.without(k)
-                            qh[q] = hasher.hi
-                            ql[q] = hasher.lo
-                            q++
-                        }
-                        ix.findMany(qh, ql, q, qs)
-                        for (k in 0 until q) {
-                            val j = qs[k]
-                            if (j < 0) continue
-                            if (first < 0) first = j
-                            val pj = ix.openingOf(j)
-                            if (op == -1) op = pj else if (pj != op) op = UNCLASSIFIED
-                            if (op == UNCLASSIFIED) break
-                        }
-                    }
-                    parent[own] = first
-                    val o = when {
-                        !cls || n < 3 -> UNCLASSIFIED
-                        n == 3 -> classifyKey(hasher)
-                        op < 0 -> UNCLASSIFIED
-                        else -> op
-                    }
-                    ix.setOpening(own, o)
-                    onClassified?.classified(b, ko, kl, vo, vl, o)
-                    if (cls) {
-                        counts[o]++
-                        classified++
-                    }
-                    if (first < 0 && !rootKeysDropped) {
-                        rootKeyBytes += kl * 2L + 32
-                        if (rootKeyBytes > ROOT_KEY_CAP) {
-                            rootKeysDropped = true
-                            rootKeys.clear()
-                        } else {
-                            rootKeys[own] = YxdbKey.toHex(b, ko, kl)
-                        }
-                    }
-                    true
-                },
-                onChunk = { loaded, tot -> if (tot > 0) progress(ScanPhase.LINK, loaded.toDouble() / tot) },
-                isCancelled = cancelled,
-            )
+        val cancelledOrDropped = {
+            if (cancelled()) true else if (dropped()) throw IndexDropped() else false
         }
-        val tLink = System.nanoTime()
-        ms[ScanPhase.LINK] = (tLink - tStats) / 1_000_000
-
-        val openings = if (countOrdered && classified > 0) counts.toList() else null
-
-        // ── subtrees · roots ── (a first parent has one stone fewer, whatever the file order)
-        ix.subtreeSizes()
-        val topS = IntArray(rootsTop)
-        val topZ = LongArray(rootsTop)
-        var topN = 0
-        for (sl in 0 until ix.m) {
-            if (parent[sl] != -1 || !ix.visited(sl)) continue
-            val z = ix.subtreeOf(sl)
-            if (topN == rootsTop && z <= topZ[topN - 1]) continue
-            var i = topN
-            while (i > 0 && topZ[i - 1] < z) i--
-            val last = minOf(topN, rootsTop - 1)
-            for (j in last downTo i + 1) {
-                topS[j] = topS[j - 1]
-                topZ[j] = topZ[j - 1]
-            }
-            topS[i] = sl
-            topZ[i] = z
-            if (topN < rootsTop) topN++
-        }
-        if (rootKeysDropped && topN > 0) {
-            val want = HashSet<Int>()
-            for (i in 0 until topN) want.add(topS[i])
+        try {
+            // ── pass 2: parents · openings (slots stand in for record numbers) ──
+            val parent = ix.parent
+            val rootKeys = HashMap<Int, String>()
+            var rootKeyBytes = 0L
+            var rootKeysDropped = false
+            val counts = LongArray(Opening26.COUNT + 1)
+            var classified = 0L
+            val qh = IntArray(1024)
+            val ql = IntArray(1024)
+            val qs = IntArray(1024)
+            records = 0
             open().use { input ->
                 Yxdb.read(
                     input, total,
-                    onRecord = { b, ko, kl, _, _, _ ->
-                        if (!hasher.load(b, ko, kl)) return@read true
+                    onRecord = { b, ko, kl, vo, vl, _ ->
+                        if (!hasher.load(b, ko, kl)) {
+                            onClassified?.classified(b, ko, kl, vo, vl, if (Yxdb.isMetaKey(b, ko, kl)) -1 else UNCLASSIFIED)
+                            return@read true
+                        }
                         hasher.hash()
                         hasher.canon()
-                        val sl = ix.find(hasher.hi, hasher.lo)
-                        if (want.remove(sl)) rootKeys[sl] = YxdbKey.toHex(b, ko, kl)
-                        want.isNotEmpty()
+                        val own = ix.find(hasher.hi, hasher.lo)
+                        if (own < 0 || ix.visited(own)) {
+                            // The same position again — only the first counts.
+                            onClassified?.classified(b, ko, kl, vo, vl, if (own < 0) UNCLASSIFIED else ix.openingOf(own))
+                            return@read true
+                        }
+                        records++
+                        val cls = classifiable(hasher.rule, hasher.w) && countOrdered
+                        val n = hasher.n
+                        var first = -1
+                        var op = -1 // parents' opening: -1 none yet
+                        if (!cls || n <= 3) {
+                            // Roots and subtrees only need the first parent.
+                            var k = hasher.lastFrom
+                            val to = hasher.lastTo
+                            while (k < to && first < 0) {
+                                hasher.without(k)
+                                first = ix.find(hasher.hi, hasher.lo)
+                                k++
+                            }
+                        } else {
+                            // Every parent — gather candidates and look them up together (overlaps cache misses).
+                            var q = 0
+                            for (k in hasher.lastFrom until hasher.lastTo) {
+                                hasher.without(k)
+                                qh[q] = hasher.hi
+                                ql[q] = hasher.lo
+                                q++
+                            }
+                            ix.findMany(qh, ql, q, qs)
+                            for (k in 0 until q) {
+                                val j = qs[k]
+                                if (j < 0) continue
+                                if (first < 0) first = j
+                                val pj = ix.openingOf(j)
+                                if (op == -1) op = pj else if (pj != op) op = UNCLASSIFIED
+                                if (op == UNCLASSIFIED) break
+                            }
+                        }
+                        parent[own] = first
+                        val o = when {
+                            !cls || n < 3 -> UNCLASSIFIED
+                            n == 3 -> classifyKey(hasher)
+                            op < 0 -> UNCLASSIFIED
+                            else -> op
+                        }
+                        ix.setOpening(own, o)
+                        onClassified?.classified(b, ko, kl, vo, vl, o)
+                        if (cls) {
+                            counts[o]++
+                            classified++
+                        }
+                        if (first < 0 && !rootKeysDropped) {
+                            rootKeyBytes += kl * 2L + 32
+                            if (rootKeyBytes > ROOT_KEY_CAP) {
+                                rootKeysDropped = true
+                                rootKeys.clear()
+                            } else {
+                                rootKeys[own] = YxdbKey.toHex(b, ko, kl)
+                            }
+                        }
+                        true
                     },
-                    onChunk = { loaded, tot -> if (tot > 0) progress(ScanPhase.ROOTS, loaded.toDouble() / tot) },
-                    isCancelled = cancelled,
+                    onChunk = { loaded, tot -> if (tot > 0) progress(ScanPhase.LINK, loaded.toDouble() / tot) },
+                    isCancelled = cancelledOrDropped,
                 )
             }
+            val tLink = System.nanoTime()
+            ms[ScanPhase.LINK] = (tLink - tStats) / 1_000_000
+
+            val openings = if (countOrdered && classified > 0) counts.toList() else null
+
+            // ── subtrees · roots ── (a first parent has one stone fewer, whatever the file order)
+            if (cancelledOrDropped()) throw YxdbCancelled()
+            ix.subtreeSizes()
+            val topS = IntArray(rootsTop)
+            val topZ = LongArray(rootsTop)
+            var topN = 0
+            for (sl in 0 until ix.m) {
+                if (parent[sl] != -1 || !ix.visited(sl)) continue
+                val z = ix.subtreeOf(sl)
+                if (topN == rootsTop && z <= topZ[topN - 1]) continue
+                var i = topN
+                while (i > 0 && topZ[i - 1] < z) i--
+                val last = minOf(topN, rootsTop - 1)
+                for (j in last downTo i + 1) {
+                    topS[j] = topS[j - 1]
+                    topZ[j] = topZ[j - 1]
+                }
+                topS[i] = sl
+                topZ[i] = z
+                if (topN < rootsTop) topN++
+            }
+            if (rootKeysDropped && topN > 0) {
+                val want = HashSet<Int>()
+                for (i in 0 until topN) want.add(topS[i])
+                open().use { input ->
+                    Yxdb.read(
+                        input, total,
+                        onRecord = { b, ko, kl, _, _, _ ->
+                            if (!hasher.load(b, ko, kl)) return@read true
+                            hasher.hash()
+                            hasher.canon()
+                            val sl = ix.find(hasher.hi, hasher.lo)
+                            if (want.remove(sl)) rootKeys[sl] = YxdbKey.toHex(b, ko, kl)
+                            want.isNotEmpty()
+                        },
+                        onChunk = { loaded, tot -> if (tot > 0) progress(ScanPhase.ROOTS, loaded.toDouble() / tot) },
+                        isCancelled = cancelledOrDropped,
+                    )
+                }
+            }
+            val roots = (0 until topN).map { DbRoot(rootKeys[topS[it]] ?: "", topZ[it]) }
+            progress(ScanPhase.ROOTS, 1.0)
+            val tEnd = System.nanoTime()
+            ms[ScanPhase.ROOTS] = (tEnd - tLink) / 1_000_000
+            ix.release()
+            return ScanResult(
+                DbStats(positions, rules, labels, commented, openings, roots, INDEX_VERSION), r1.count, r1.compressed, r1.rawBytes,
+                sorted, duplicates, countOrdered, special, null, !countOrdered, indexBytes, ms,
+                (tEnd - t0) / 1_000_000,
+            )
+        } catch (_: IndexDropped) {
+            ix.release()
+            return statsOnly(IndexSkipped.MEMORY)
         }
-        val roots = (0 until topN).map { DbRoot(rootKeys[topS[it]] ?: "", topZ[it]) }
-        progress(ScanPhase.ROOTS, 1.0)
-        val tEnd = System.nanoTime()
-        ms[ScanPhase.ROOTS] = (tEnd - tLink) / 1_000_000
-        ix.release()
-        return ScanResult(
-            DbStats(positions, rules, labels, commented, openings, roots, INDEX_VERSION), r1.count, r1.compressed, r1.rawBytes,
-            sorted, duplicates, countOrdered, special, null, !countOrdered, indexBytes, ms,
-            (tEnd - t0) / 1_000_000,
-        )
+    }
+
+    /** [scan]'s `dropIndex` fired inside a pass — unwinds to the stats-only result. */
+    private class IndexDropped : RuntimeException() {
+        override fun fillInStackTrace(): Throwable = this
     }
 
     /** Three-stone key → opening. Of the two black stones the centre is move 1, the other move 3. */

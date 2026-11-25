@@ -1,5 +1,6 @@
 package dev.gomoku.zenyth.data.library
 
+import android.os.ParcelFileDescriptor
 import dev.gomoku.zenyth.domain.library.FileStat
 import dev.gomoku.zenyth.domain.library.Fingerprint
 import dev.gomoku.zenyth.domain.library.LibraryEntries
@@ -101,6 +102,10 @@ open class TreeSource(
 
     override suspend fun openRead(name: String): InputStream? = withContext(io) {
         files(null).find(name)?.let { tree.openInput(it.id) }
+    }
+
+    override suspend fun openFd(name: String, mode: String): ParcelFileDescriptor? = withContext(io) {
+        files(null).find(name)?.let { tree.openFd(it.id, mode) }
     }
 
     override suspend fun fingerprint(name: String): Fingerprint? = withContext(io) {

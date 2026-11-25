@@ -1,5 +1,6 @@
 package dev.gomoku.zenyth.data.library
 
+import android.os.ParcelFileDescriptor
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -46,6 +47,9 @@ class FileDocTree(val root: File) : DocTree {
     }
 
     override fun openInput(id: String): InputStream = FileInputStream(file(id))
+
+    override fun openFd(id: String, mode: String): ParcelFileDescriptor =
+        ParcelFileDescriptor.open(file(id), ParcelFileDescriptor.parseMode(mode))
 
     override fun openOutput(id: String): OutputStream = object : FileOutputStream(file(id)) {
         private var closed = false

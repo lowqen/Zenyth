@@ -77,6 +77,13 @@ class ContentDocTree(private val resolver: ContentResolver, val treeUri: Uri) : 
         return ParcelFileDescriptor.AutoCloseInputStream(pfd)
     }
 
+    override fun openFd(id: String, mode: String): ParcelFileDescriptor {
+        val uri = uriOf(id)
+        // As openOutput: a few providers know "w" but not "wt" (and truncate on their own).
+        val pfd = if (mode == "wt") runCatching { resolver.openFileDescriptor(uri, mode) }.getOrNull() else null
+        return pfd ?: resolver.openFileDescriptor(uri, if (mode == "wt") "w" else mode) ?: throw FileNotFoundException(id)
+    }
+
     override fun openOutput(id: String): OutputStream {
         val uri = uriOf(id)
         // "wt" truncates; a few providers only know "w" (and then truncate on their own).

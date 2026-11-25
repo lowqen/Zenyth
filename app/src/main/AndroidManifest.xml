@@ -65,5 +65,15 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Library byte work (stats · index · merge · split · copy) in its own
+             process (L5 design §2.2): its own heap limit, instant cancel by
+             killing it, and an OOM there leaves the board and the engine alone.
+             Bound for messages; foreground only while a job runs. -->
+        <service
+            android:name=".data.library.job.LibraryJobService"
+            android:exported="false"
+            android:process=":library"
+            android:foregroundServiceType="dataSync" />
+
     </application>
 </manifest>

@@ -1,5 +1,6 @@
 package dev.gomoku.zenyth.data.library
 
+import android.os.ParcelFileDescriptor
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -52,6 +53,13 @@ interface DocTree {
 
     /** Moves into another directory of the tree, keeping the name; null when the provider cannot. */
     fun move(id: String, fromDir: String?, toDir: String?): DocEntry?
+
+    /**
+     * A descriptor for the library job process (L5-3) — `r`, `w`, `wt`, `rw`.
+     * Sent across processes, so the job process needs no SAF grant.
+     */
+    fun openFd(id: String, mode: String): ParcelFileDescriptor =
+        throw UnsupportedOperationException("openFd")
 
     /** Only when [atomicReplace]: renames [id] to [name], replacing what is there. */
     fun replace(id: String, name: String): DocEntry =

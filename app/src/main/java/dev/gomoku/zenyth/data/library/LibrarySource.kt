@@ -1,5 +1,6 @@
 package dev.gomoku.zenyth.data.library
 
+import android.os.ParcelFileDescriptor
 import dev.gomoku.zenyth.domain.library.FileStat
 import dev.gomoku.zenyth.domain.library.Fingerprint
 import dev.gomoku.zenyth.domain.library.LibraryManifest
@@ -24,6 +25,9 @@ class StagedFile(private val tree: DocTree, val docId: String) {
     /** Truncates; syncs to storage on close. */
     fun openOutput(): OutputStream = tree.openOutput(docId)
     fun openInput(): InputStream = tree.openInput(docId)
+
+    /** For the job process: `wt` to write, then `r` (opened after) to read back. */
+    fun openFd(mode: String): ParcelFileDescriptor = tree.openFd(docId, mode)
 }
 
 /**
@@ -42,6 +46,8 @@ interface LibrarySource {
     suspend fun list(): List<FileStat>
     suspend fun stat(name: String): FileStat?
     suspend fun openRead(name: String): InputStream?
+    /** A descriptor for the library job process ([dev.gomoku.zenyth.data.library.job.LibraryJobClient]); null when absent. */
+    suspend fun openFd(name: String, mode: String = "r"): ParcelFileDescriptor?
     /** Size + FNV-1a 64 of the last 4 KB — reads the tail only. */
     suspend fun fingerprint(name: String): Fingerprint?
 

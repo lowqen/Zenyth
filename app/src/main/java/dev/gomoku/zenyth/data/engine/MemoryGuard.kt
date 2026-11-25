@@ -54,7 +54,10 @@ class MemoryGuard @Inject constructor(
             }.getOrDefault(emptyList()).filter { it.timestamp > seen }
             if (exits.isEmpty()) return@launch
             store.setExitSeenMs(exits.maxOf { it.timestamp })
-            if (wasOpen && exits.any { it.reason == ApplicationExitInfo.REASON_LOW_MEMORY }) lower("app killed for memory")
+            // The UI process only: the library job process (`:library`) dying of
+            // its own index says nothing about the engine's table.
+            val ui = exits.filter { it.processName == context.packageName }
+            if (wasOpen && ui.any { it.reason == ApplicationExitInfo.REASON_LOW_MEMORY }) lower("app killed for memory")
         }
     }
 
