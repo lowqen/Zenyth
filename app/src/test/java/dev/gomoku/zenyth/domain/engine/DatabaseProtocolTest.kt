@@ -164,6 +164,7 @@ class DatabaseProtocolTest {
         assertEquals("yxsavedatabase", DbSave.serialize(coord))
         assertEquals("yxdbcheck", DbCheck.serialize(coord))
         assertEquals("yxdbfix", DbFix.serialize(coord))
+        assertEquals("yxcompactdatabase", DbCompact.serialize(coord))
         assertEquals("info usedatabase 1", DbUse(true).serialize(coord))
         assertEquals("info usedatabase 0", DbUse(false).serialize(coord))
     }

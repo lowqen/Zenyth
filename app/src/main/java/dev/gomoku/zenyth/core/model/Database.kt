@@ -265,6 +265,18 @@ data class DbState(
     fun canWrite(connected: Boolean): Boolean = enabled && !readOnly && connected
 }
 
+/**
+ * What the engine in front of us has done with its database file, as its own
+ * `DATABASE LOAD|SAVE` lines say (library L5-4 — the attach controller folds
+ * and swaps on these). Reset when the engine process goes away.
+ */
+data class DbFileState(
+    /** The engine finished reading its database — a save would write all of it. */
+    val loaded: Boolean = false,
+    /** A save it began has not reported its end yet. */
+    val saving: Boolean = false,
+)
+
 /** Outcome of a database operation request. */
 sealed interface DbOpResult {
     /** Command handed to the engine (the engine reports the result asynchronously). */

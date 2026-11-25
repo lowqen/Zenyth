@@ -55,6 +55,15 @@ class DatabaseAttachGuard {
     }
 
     /**
+     * `YXSETDATABASE` loads the named file at once, whatever `usedatabase` said
+     * (L5-0) — from then on the engine holds a database, and a later
+     * `usedatabase 1` must not load a second one.
+     */
+    fun markAttached() {
+        attached = true
+    }
+
+    /**
      * Forget the attach state. The proxy spawns a fresh Rapfi per connection, so
      * every new socket starts with no database and must attach again.
      */

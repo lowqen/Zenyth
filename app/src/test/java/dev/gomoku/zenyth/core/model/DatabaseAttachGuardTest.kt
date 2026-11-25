@@ -83,4 +83,14 @@ class DatabaseAttachGuardTest {
         assertThat(guard.allow("usedatabase", " 1 ")).isTrue()
         assertThat(guard.allow("usedatabase", "1")).isFalse()
     }
+
+    /** L5-0: `YXSETDATABASE` loads at once — a later `usedatabase 1` would be a second copy. */
+    @Test
+    fun yxSetDatabaseCountsAsTheAttach() {
+        guard.markAttached()
+        assertThat(guard.isAttached).isTrue()
+        assertThat(guard.allow("usedatabase", "1")).isFalse()
+        assertThat(guard.allow("usedatabase", "0")).isTrue()
+        assertThat(guard.allow("usedatabase", "1")).isTrue()
+    }
 }

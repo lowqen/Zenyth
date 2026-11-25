@@ -13,6 +13,7 @@ import dev.gomoku.zenyth.core.model.SettingEditor
 import dev.gomoku.zenyth.core.model.SettingsFile
 import dev.gomoku.zenyth.data.engine.DebugLogWriter
 import dev.gomoku.zenyth.data.engine.LocalEngineInstaller
+import dev.gomoku.zenyth.data.library.AttachedDbStore
 import dev.gomoku.zenyth.data.prefs.EndpointStore
 import dev.gomoku.zenyth.data.prefs.LocalEngineStore
 import dev.gomoku.zenyth.data.settings.SettingsFileIo
@@ -38,6 +39,7 @@ class SettingsViewModel @Inject constructor(
     private val localEngineStore: LocalEngineStore,
     private val endpointStore: EndpointStore,
     localEngine: LocalEngineInstaller,
+    attachedDb: AttachedDbStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
@@ -71,10 +73,12 @@ class SettingsViewModel @Inject constructor(
         }
         // Where the device's own database ends up. Worth showing: it is the one
         // file of this app's the user might want to pull off the phone, and it
-        // is nowhere a file manager will stumble on it.
+        // is nowhere a file manager will stumble on it. Since the library (L5-4)
+        // that is the attached entry; the old `engine/rapfi.db` until it moves in.
+        val localDb = attachedDb.enginePath()?.let { File(it) } ?: File(localEngine.engineDir, LOCAL_DB_NAME)
         _state.update {
             it.copy(
-                localDbPath = File(localEngine.engineDir, LOCAL_DB_NAME).path,
+                localDbPath = localDb.path,
                 threadChoices = LocalEngineProfile.threadChoices(localEngineStore.defaults.threads),
             )
         }
@@ -82,9 +86,9 @@ class SettingsViewModel @Inject constructor(
             localEngineStore.memoryCapMb.collect { cap -> _state.update { it.copy(memoryCapMb = cap) } }
         }
         viewModelScope.launch(Dispatchers.IO) {
-            val db = File(localEngine.engineDir, LOCAL_DB_NAME)
-            // The engine journals saves into `rapfi.db.journal` (DB6) until it folds them in.
-            val journal = File(localEngine.engineDir, "$LOCAL_DB_NAME.journal")
+            val db = localDb
+            // The engine journals saves into `<db>.journal` (DB6) until it folds them in.
+            val journal = File(db.path + ".journal")
             val bytes = db.takeIf { it.isFile }?.let { it.length() + journal.length() }
             val warn = MemoryTier.databaseWarnBytes(localEngineStore.totalRamMb)
             _state.update { it.copy(localDbBytes = bytes, localDbWarnBytes = warn) }

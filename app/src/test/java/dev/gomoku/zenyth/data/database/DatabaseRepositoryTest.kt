@@ -7,6 +7,7 @@ import dev.gomoku.zenyth.core.model.ConnectionState
 import dev.gomoku.zenyth.core.model.ConsoleLine
 import dev.gomoku.zenyth.core.model.DbDeleteFilter
 import dev.gomoku.zenyth.core.model.DbDeleteScope
+import dev.gomoku.zenyth.core.model.DbFileState
 import dev.gomoku.zenyth.core.model.DbOpResult
 import dev.gomoku.zenyth.core.model.EngineCapabilities
 import dev.gomoku.zenyth.core.model.EngineBusy
@@ -570,4 +571,44 @@ class DatabaseRepositoryTest {
     }
 
     private fun pack(text: String): Int = text.fold(0) { acc, c -> (acc shl 8) or c.code }
+
+    // ---- library L5-4 -------------------------------------------------------
+
+    @Test
+    fun `compact folds under the save's rules and never attaches`() = dbTest { h ->
+        runCurrent()
+        h.engine.sent.clear()
+        // Nothing loaded: refused, and no attach either (unlike a person's save).
+        assertTrue(h.repository.compact() is DbOpResult.Refused)
+        runCurrent()
+        assertTrue(h.engine.sent.isEmpty())
+
+        emit(h, "MESSAGE DATABASE LOAD START /x/library/a.db")
+        emit(h, "MESSAGE DATABASE LOAD DONE")
+        runCurrent()
+        assertEquals(DbOpResult.Sent, h.repository.compact())
+        runCurrent()
+        assertEquals(listOf("yxcompactdatabase"), h.engine.sent)
+    }
+
+    @Test
+    fun `file state follows the engine's load and save lines`() = dbTest { h ->
+        runCurrent()
+        assertEquals(DbFileState(), h.repository.fileState.value)
+        emit(h, "MESSAGE DATABASE LOAD START /x/library/a.db")
+        runCurrent()
+        assertEquals(DbFileState(loaded = false), h.repository.fileState.value)
+        emit(h, "MESSAGE DATABASE LOAD DONE")
+        runCurrent()
+        assertEquals(DbFileState(loaded = true), h.repository.fileState.value)
+        emit(h, "MESSAGE DATABASE SAVE START /x/library/a.db")
+        runCurrent()
+        assertEquals(DbFileState(loaded = true, saving = true), h.repository.fileState.value)
+        emit(h, "MESSAGE DATABASE SAVE DONE")
+        runCurrent()
+        assertEquals(DbFileState(loaded = true, saving = false), h.repository.fileState.value)
+        h.engine.stateFlow.value = ConnectionState.Disconnected
+        runCurrent()
+        assertEquals(DbFileState(), h.repository.fileState.value)
+    }
 }

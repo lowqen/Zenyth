@@ -71,6 +71,16 @@ class FakeDocTree(private val canMove: Boolean = true) : DocTree {
     fun text(name: String, dir: String? = null): String? =
         nodes.values.firstOrNull { it.parent == dir && it.name == name }?.bytes?.decodeToString()
 
+    fun bytes(name: String, dir: String? = null): ByteArray? =
+        nodes.values.firstOrNull { it.parent == dir && it.name == name }?.bytes
+
+    /** Changes a file in place, as another device writing the folder would (L5-4 conflicts). */
+    fun overwrite(name: String, bytes: ByteArray, dir: String? = null) {
+        val n = nodes.values.first { it.parent == dir && it.name == name }
+        n.bytes = bytes
+        n.mtime = ++clock
+    }
+
     fun trashDir(): String? = nodes.values.firstOrNull { it.isDir && it.parent == null && it.name == ".zenyth-trash" }?.id
 
     // ── DocTree ──

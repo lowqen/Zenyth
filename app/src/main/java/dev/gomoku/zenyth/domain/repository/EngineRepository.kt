@@ -40,6 +40,15 @@ interface EngineRepository {
      */
     val savesDuringSearch: Boolean get() = false
 
+    /** The engine in front of us is the on-device one (the library attaches only there — L5-4). */
+    val isLocal: Boolean get() = false
+
+    /**
+     * This engine process holds a database (`usedatabase 1` or `YXSETDATABASE`
+     * went out since it started). Switching entries detaches it first.
+     */
+    val holdsDatabase: Boolean get() = false
+
     /** Open a session with [target] — the server across Tailscale, or this phone. */
     suspend fun connect(target: EngineTarget)
     suspend fun send(command: EngineCommand)

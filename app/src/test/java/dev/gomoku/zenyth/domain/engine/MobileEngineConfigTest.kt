@@ -98,4 +98,35 @@ class MobileEngineConfigTest {
         assertThat(error).isInstanceOf(IllegalArgumentException::class.java)
         assertThat(error!!.message).contains("coord_conversion_mode")
     }
+
+    // ---- library L5-4: the attached entry's path ------------------------------
+
+    @Test
+    fun `the attached entry's path replaces the database url and nothing else`() {
+        val path = "/data/user/0/dev.gomoku.rapfidroid/files/library/0b6c4c1e-1111-4222-8333-444455556666.db"
+        val before = template().lines()
+        val after = MobileEngineConfig.render(template(), LocalEngineProfile(), path).lines()
+
+        assertThat(after).hasSize(before.size)
+        val changed = before.indices.filter { before[it] != after[it] }
+        assertThat(changed.map { before[it].trim().substringBefore(' ') })
+            .containsExactly("default_tt_size_kb", "default_thread_num", "url")
+        assertThat(after).contains("url = \"$path\"")
+    }
+
+    @Test
+    fun `no url keeps the template's rapfi_db`() {
+        val out = MobileEngineConfig.render(template(), LocalEngineProfile(), null)
+        assertThat(out).contains("url = \"rapfi.db\"")
+    }
+
+    @Test
+    fun `only the url of the database table is touched, and quotes are escaped`() {
+        val t = template().replace("[database]", "[other]\nurl = \"keep\"\n\n[database]")
+        // /a"b\c.db  →  TOML  "/a\"b\\c.db"
+        val out = MobileEngineConfig.render(t, LocalEngineProfile(), "/a\"b\\c.db")
+        assertThat(out).contains("url = \"keep\"")
+        assertThat(out).contains("url = \"/a\\\"b\\\\c.db\"")
+        assertThat(out).doesNotContain("url = \"rapfi.db\"")
+    }
 }

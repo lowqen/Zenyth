@@ -239,6 +239,16 @@ data object DbSave : DbSimpleCommand {
     override val line: String get() = "yxsavedatabase"
 }
 
+/**
+ * `yxcompactdatabase` (Zenyth DB6): fold `<db>.journal` into the main file with
+ * a full save — the file is then whole on its own, which is what the library
+ * needs before it copies a database out (SAF write-back) or swaps it (L5-4).
+ * Ends like a save (`Saved database file …` / `DATABASE SAVE DONE`).
+ */
+data object DbCompact : DbSimpleCommand {
+    override val line: String get() = "yxcompactdatabase"
+}
+
 /** `dbcheck` — integrity check. */
 data object DbCheck : DbSimpleCommand {
     override val line: String get() = "yxdbcheck"

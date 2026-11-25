@@ -30,13 +30,15 @@ class LocalEngineTransport(
     private val profile: LocalEngineProfile,
     /** The process died of SIGKILL without being asked to close (T3 — see [MemoryGuard]). */
     private val onKilled: () -> Unit = {},
+    /** The attached library entry to bake into `config.toml` (L5-4); null = the template's. */
+    private val databaseUrl: String? = null,
 ) : EngineTransport {
 
     override val label: String get() = "on-device"
 
     override suspend fun open(): EngineChannel {
         val variant = installer.variant()
-        val dir = installer.prepare(profile, variant)
+        val dir = installer.prepare(profile, variant, databaseUrl)
         val process = try {
             ProcessBuilder(listOf(installer.binaryFor(variant).absolutePath))
                 .directory(dir)
@@ -84,7 +86,7 @@ class LocalEngineTransport(
             // These are ordinary writes on the same pipe, so the engine executes
             // them before it sees EOF — no waiting for a reply is needed:
             //   YXSTOP         end the search, so waitForIdle() returns at once
-            //   YXSAVEDATABASE flush the database to rapfi.db
+            //   YXSAVEDATABASE flush the database to its file
             //   EOF            runProtocol() returns true and the engine exits
             runCatching {
                 sink.writeUtf8("YXSTOP\nYXSAVEDATABASE\n").flush()

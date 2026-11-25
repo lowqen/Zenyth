@@ -32,8 +32,9 @@ class LocalEngineUnavailable(message: String, cause: Throwable? = null) :
  *    has no `--config` argument (that lives behind `COMMAND_MODULES`), so Rapfi
  *    finds its config and its weights by resolving them from the cwd.
  *
- * `rapfi.db` is written by the engine into that same directory, so extraction
- * overwrites rather than wipes — a database must survive an app update.
+ * Extraction overwrites rather than wipes. The database used to be `rapfi.db`
+ * in this directory; since the library (L5-4) it is the attached entry under
+ * `filesDir/library/`, baked into `config.toml`'s `url` by [prepare].
  */
 @Singleton
 class LocalEngineInstaller @Inject constructor(
@@ -74,11 +75,14 @@ class LocalEngineInstaller @Inject constructor(
      * Extract on first run (and after every app update), then write the config
      * for [profile]. Returns the working directory to start the engine in.
      *
+     * @param databaseUrl the attached library entry's path (L5-4); null keeps
+     *   the template's `rapfi.db`.
+     *
      * The config is rewritten every time because the profile can change without
      * the APK changing; the 40 MB of weights are only re-extracted when the
      * install itself changed, which is the only thing that can change them.
      */
-    fun prepare(profile: LocalEngineProfile, variant: EngineVariant): File {
+    fun prepare(profile: LocalEngineProfile, variant: EngineVariant, databaseUrl: String? = null): File {
         val exe = binaryFor(variant)
         val name = variant.binaryName
         if (!exe.exists()) {
@@ -109,7 +113,7 @@ class LocalEngineInstaller @Inject constructor(
             val template = context.assets.open("$ASSET_DIR/$CONFIG_NAME")
                 .use { it.readBytes() }
                 .decodeToString()
-            File(dir, CONFIG_NAME).writeText(MobileEngineConfig.render(template, profile))
+            File(dir, CONFIG_NAME).writeText(MobileEngineConfig.render(template, profile, databaseUrl))
         } catch (e: LocalEngineUnavailable) {
             throw e
         } catch (e: Exception) {

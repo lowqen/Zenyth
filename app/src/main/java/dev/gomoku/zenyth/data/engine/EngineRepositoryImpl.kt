@@ -16,7 +16,9 @@ import dev.gomoku.zenyth.core.model.Move
 import dev.gomoku.zenyth.core.model.Position
 import dev.gomoku.zenyth.core.model.capHash
 import dev.gomoku.zenyth.core.model.capThreads
+import dev.gomoku.zenyth.data.library.AttachedDbStore
 import dev.gomoku.zenyth.data.prefs.LocalEngineStore
+import dev.gomoku.zenyth.domain.engine.DbSetFile
 import dev.gomoku.zenyth.domain.engine.CoordMapper
 import dev.gomoku.zenyth.domain.engine.EngineCommand
 import dev.gomoku.zenyth.domain.engine.EngineResponse
@@ -61,6 +63,7 @@ class EngineRepositoryImpl @Inject constructor(
     private val localEngineStore: LocalEngineStore,
     private val thermal: ThermalMonitor,
     private val memoryGuard: MemoryGuard,
+    private val attachedDb: AttachedDbStore,
     @ApplicationContext private val context: Context,
     @IoDispatcher private val io: CoroutineDispatcher,
 ) : EngineRepository {
@@ -91,6 +94,21 @@ class EngineRepositoryImpl @Inject constructor(
     override val savesDuringSearch: Boolean
         get() = lastTarget?.isLocal == true
 
+    override val isLocal: Boolean
+        get() = lastTarget?.isLocal == true
+
+    override val holdsDatabase: Boolean
+        get() = databaseGuard.isAttached
+
+    /**
+     * The database file this engine process loads on `usedatabase 1`: what was
+     * baked into its `config.toml`, then whatever `YXSETDATABASE` named. When
+     * the library has attached another entry since, the attach goes out as
+     * `YXSETDATABASE <that entry>` instead (see [dispatch]).
+     */
+    @Volatile
+    private var engineDbUrl: String? = null
+
     /**
      * Resource limits for the on-device engine, mirrored from [LocalEngineStore]
      * by the collector below. Its default has to be usable before that first
@@ -118,9 +136,18 @@ class EngineRepositoryImpl @Inject constructor(
     @Volatile
     private var parked: EngineTarget? = null
 
-    private fun transportFor(target: EngineTarget): EngineTransport = when (target) {
+    /**
+     * For the on-device engine the library decides the database first (L5-4):
+     * the old `rapfi.db` moves in once, and the attached entry's path is baked
+     * into `config.toml` — so `usedatabase 1` loads that entry.
+     */
+    private suspend fun transportFor(target: EngineTarget): EngineTransport = when (target) {
         is EngineTarget.Remote -> TcpTransport(target.endpoint)
-        EngineTarget.Local -> LocalEngineTransport(localEngine, localProfile, memoryGuard::onEngineKilled)
+        EngineTarget.Local -> {
+            val url = runCatching { attachedDb.bootPath() }.getOrNull()
+            engineDbUrl = url ?: TEMPLATE_DB_URL
+            LocalEngineTransport(localEngine, localProfile, memoryGuard::onEngineKilled, url)
+        }
     }
 
     /**
@@ -383,10 +410,31 @@ class EngineRepositoryImpl @Inject constructor(
         if (command is EngineCommand.Info && !databaseGuard.allow(command.key, command.value)) {
             return
         }
+        if (command is EngineCommand.Info && redirectAttach(command)) return
+        if (command is DbSetFile) {
+            databaseGuard.markAttached()
+            engineDbUrl = command.path.trim()
+        }
         val text = command.serialize(coord)
         if (echo) _console.emit(ConsoleLine(outbound = true, text = text))
         for (line in text.split('\n')) connection.writeLine(line)
         if (startsSearch(command)) searching.value = true
+    }
+
+    /**
+     * `usedatabase 1` to the on-device engine loads the url it was started with.
+     * If the library attached another entry while no database was held (the
+     * switch is then only recorded), that url is stale: load the entry itself
+     * with `YXSETDATABASE` — which loads at once too, and the guard has already
+     * counted this as the attach.
+     */
+    private suspend fun redirectAttach(command: EngineCommand.Info): Boolean {
+        if (!command.key.equals(DatabaseAttachGuard.KEY, ignoreCase = true) || command.value.trim() != "1") return false
+        if (lastTarget?.isLocal != true) return false
+        val want = attachedDb.enginePath() ?: return false
+        if (want == engineDbUrl) return false
+        dispatch(DbSetFile(want))
+        return true
     }
 
     private fun startsSearch(command: EngineCommand): Boolean = when (command) {
@@ -613,6 +661,9 @@ class EngineRepositoryImpl @Inject constructor(
 
     private companion object {
         const val CONSOLE_REPLAY = 300
+
+        /** `[database] url` in the shipped `config.toml`, when nothing else is baked in. */
+        const val TEMPLATE_DB_URL = "rapfi.db"
         const val FORBID_TIMEOUT_MS = 3_000L
         const val STOP_WAIT_MS = 3_000L
         const val UNLIMITED_TURN_MS = 2_000_000L

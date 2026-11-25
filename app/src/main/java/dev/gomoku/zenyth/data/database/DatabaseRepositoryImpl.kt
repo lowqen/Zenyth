@@ -4,6 +4,7 @@ import dev.gomoku.zenyth.core.common.IoDispatcher
 import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.core.model.ConnectionState
 import dev.gomoku.zenyth.core.model.DbDeleteScope
+import dev.gomoku.zenyth.core.model.DbFileState
 import dev.gomoku.zenyth.core.model.DbOpResult
 import dev.gomoku.zenyth.core.model.DbState
 import dev.gomoku.zenyth.core.model.EngineBusy
@@ -13,6 +14,7 @@ import dev.gomoku.zenyth.core.model.StoneColor
 import dev.gomoku.zenyth.domain.engine.DatabaseAggregator
 import dev.gomoku.zenyth.domain.engine.DbCheck
 import dev.gomoku.zenyth.domain.engine.DbClearBestMove
+import dev.gomoku.zenyth.domain.engine.DbCompact
 import dev.gomoku.zenyth.domain.engine.DbDeleteAll
 import dev.gomoku.zenyth.domain.engine.DbDeleteOne
 import dev.gomoku.zenyth.domain.engine.DbEditComment
@@ -109,6 +111,10 @@ class DatabaseRepositoryImpl @Inject constructor(
 
     @Volatile
     private var loadState = LoadState.NONE
+        set(value) {
+            field = value
+            publishFileState()
+        }
 
     /**
      * A save the engine has begun and not finished. It rewrites the whole file,
@@ -118,6 +124,18 @@ class DatabaseRepositoryImpl @Inject constructor(
      */
     @Volatile
     private var savingSince: Long? = null
+        set(value) {
+            field = value
+            publishFileState()
+        }
+
+    private val _fileState = MutableStateFlow(DbFileState())
+    override val fileState: StateFlow<DbFileState> = _fileState.asStateFlow()
+
+    private fun publishFileState() {
+        // Runs from the two setters above; both fields are read as they now stand.
+        _fileState.value = DbFileState(loaded = loadState == LoadState.LOADED, saving = savingSince != null)
+    }
 
     init {
         repoScope.launch {
@@ -379,13 +397,16 @@ class DatabaseRepositoryImpl @Inject constructor(
 
     override suspend fun saveIfLoaded(): DbOpResult = save(attachIfMissing = false)
 
+    /** Same gates as the timer's save; only the command differs (L5-4). */
+    override suspend fun compact(): DbOpResult = save(attachIfMissing = false, command = DbCompact)
+
     /**
      * @param attachIfMissing whether a missing database may be attached from
      *   here. True when a person asked for the save; **false for the timer** —
      *   an attach reloads the whole file into the engine, and a timer that did
      *   that every interval would be the RAM disaster of session 48 on a loop.
      */
-    private suspend fun save(attachIfMissing: Boolean): DbOpResult {
+    private suspend fun save(attachIfMissing: Boolean, command: EngineCommand = DbSave): DbOpResult {
         // Connected, database on, not read-only — asked first because they are
         // the answers the user can act on, and because attaching a database the
         // user turned off would be answering a question nobody asked.
@@ -444,8 +465,11 @@ class DatabaseRepositoryImpl @Inject constructor(
             savingSince = null
         }
         return guarded(write = true) {
-            send(DbSave)
-            log(tr("저장 요청", "Save requested", "已请求保存"))
+            send(command)
+            log(
+                if (command == DbCompact) tr("접어 저장 요청", "Compact save requested", "已请求合并保存")
+                else tr("저장 요청", "Save requested", "已请求保存"),
+            )
         }
     }
 

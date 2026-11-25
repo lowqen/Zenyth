@@ -28,11 +28,37 @@ object MobileEngineConfig {
     /** `default_thread_num` — 0 would mean every core including the little ones. */
     private const val THREADS_KEY = "default_thread_num"
 
-    fun render(template: String, profile: LocalEngineProfile): String {
+    /** `[database] url` — the file `INFO usedatabase 1` loads. */
+    private const val URL_KEY = "url"
+
+    /**
+     * @param databaseUrl the library entry to attach at boot (L5-4) — an
+     *   absolute path under `filesDir`, ASCII by construction (`<uuid>.db`, a
+     *   staging copy). Null keeps the template's own `rapfi.db`.
+     */
+    fun render(template: String, profile: LocalEngineProfile, databaseUrl: String? = null): String {
         var out = replaceScalar(template, TT_KEY, profile.ttSizeKb.toString())
         out = replaceScalar(out, THREADS_KEY, profile.threads.toString())
+        if (databaseUrl != null) out = replaceDatabaseUrl(out, databaseUrl)
         requireCoordModeNone(out)
         return out
+    }
+
+    /**
+     * Only the `url` inside `[database]` — another table may grow a key of the
+     * same name. Written as a TOML basic string.
+     */
+    private fun replaceDatabaseUrl(text: String, url: String): String {
+        require(url.none { it < ' ' }) { "database url has a control character" }
+        val start = Regex("""^[ \t]*\[database][ \t]*$""", RegexOption.MULTILINE).find(text)
+        require(start != null) {
+            tr("config.toml 템플릿에 [database] 표가 없습니다", "config.toml template has no [database] table", "config.toml 模板中没有 [database] 表")
+        }
+        val bodyStart = start.range.last + 1
+        val next = Regex("""^[ \t]*\[""", RegexOption.MULTILINE).find(text, bodyStart)?.range?.first ?: text.length
+        val body = text.substring(bodyStart, next)
+        val quoted = "\"" + url.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        return text.substring(0, bodyStart) + replaceScalar(body, URL_KEY, quoted) + text.substring(next)
     }
 
     /**

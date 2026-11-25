@@ -1,10 +1,12 @@
 package dev.gomoku.zenyth.domain.repository
 
 import dev.gomoku.zenyth.core.model.DbDeleteScope
+import dev.gomoku.zenyth.core.model.DbFileState
 import dev.gomoku.zenyth.core.model.DbOpResult
 import dev.gomoku.zenyth.core.model.DbState
 import dev.gomoku.zenyth.core.model.Move
 import dev.gomoku.zenyth.core.model.Position
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -74,6 +76,15 @@ interface DatabaseRepository {
      * background (T3), where a low-memory kill would lose everything since the last save.
      */
     suspend fun saveIfLoaded(): DbOpResult
+
+    /**
+     * `YXCOMPACTDATABASE` under [saveIfLoaded]'s rules (never an attach): folds
+     * the journal so the main file is whole on its own (library L5-4).
+     */
+    suspend fun compact(): DbOpResult = saveIfLoaded()
+
+    /** Loaded · saving, from the engine's own lines — see [DbFileState]. */
+    val fileState: StateFlow<DbFileState> get() = IDLE_FILE_STATE
     suspend fun openFile(path: String): DbOpResult
     suspend fun merge(path: String): DbOpResult
 
@@ -100,3 +111,5 @@ interface DatabaseRepository {
 
     fun clearLog()
 }
+
+private val IDLE_FILE_STATE: StateFlow<DbFileState> = MutableStateFlow(DbFileState())
