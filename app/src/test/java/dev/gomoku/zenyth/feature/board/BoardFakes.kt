@@ -220,7 +220,6 @@ internal class FakeDatabase : DatabaseRepository {
     override suspend fun fix() = DbOpResult.Sent
     override suspend fun setEnabled(on: Boolean) = Unit
     override suspend fun setReadOnly(on: Boolean) = Unit
-    override suspend fun setDestructiveUnlocked(on: Boolean) = Unit
     override fun clearLog() = Unit
 }
 

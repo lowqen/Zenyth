@@ -1,7 +1,6 @@
 package dev.gomoku.zenyth.feature.tools
 
 import dev.gomoku.zenyth.core.designsystem.component.ZenythFilterChip
-import dev.gomoku.zenyth.core.designsystem.theme.LocalProMode
 import dev.gomoku.zenyth.core.designsystem.component.rememberCalmFling
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,10 +27,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,52 +37,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.gomoku.zenyth.core.designsystem.component.QuietSwitch
-import dev.gomoku.zenyth.core.designsystem.component.ZenythSegmented
-import dev.gomoku.zenyth.core.designsystem.component.ZenythTopBar
 import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.core.model.CallbackConfig
 import dev.gomoku.zenyth.core.model.ToolScripts
 import dev.gomoku.zenyth.core.model.ToolsState
-import dev.gomoku.zenyth.feature.connection.ConnectionScreen
-
-/**
- * The engine tab: 「연결」 keeps the socket screen, 「도구」 adds the operations
- * menu. Two tabs rather than an eighth bottom-nav entry, the same way the
- * explorer pairs its two research tools.
- */
-@Composable
-fun EngineScreen(modifier: Modifier = Modifier) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
-    val titles = remember { listOf(tr("연결", "Connect", "连接"), tr("도구", "Tools", "工具")) }
-
-    Column(modifier = modifier.fillMaxSize()) {
-        ZenythTopBar(title = tr("엔진", "Engine", "引擎"))
-        // Tools — hash, blocked points, scripts, the command language — is an
-        // expert surface: without «고급 사용자 모드» the tab is the connection.
-        val pro = LocalProMode.current
-        if (pro) {
-            ZenythSegmented(
-                options = titles.mapIndexed { i, title -> i to title },
-                selection = tab,
-                onSelect = { tab = it },
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                fill = true,
-            )
-        }
-        QuietSwitch(if (pro) tab else 0, Modifier.fillMaxSize()) { index ->
-            when (index) {
-                0 -> ConnectionScreen()
-                else -> ToolsScreen()
-            }
-        }
-    }
-}
 
 /**
  * Engine operations — hash tools, blocked points, the position stack,
  * maintenance scripts and the console command language (main.c
  * `execute_command`, and the toolbar scripts in `function/toolbar33-36.txt`).
+ *
+ * The «도구» fold of the board's «로그» pane (L5-5; the engine tab's second
+ * half before), expert only: its list takes the console's place while open.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -108,7 +71,8 @@ fun ToolsScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(12.dp),
+        // The pane around it has its own margins (the board sheet's).
+        contentPadding = PaddingValues(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         flingBehavior = rememberCalmFling(),
     ) {

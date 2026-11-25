@@ -1,11 +1,11 @@
 package dev.gomoku.zenyth.feature.settings
 
+import dev.gomoku.zenyth.core.designsystem.component.ZenythFilterChip
 import dev.gomoku.zenyth.core.designsystem.component.ZenythSwitch
 import dev.gomoku.zenyth.core.designsystem.component.QuietSwitch
 import androidx.activity.compose.BackHandler
 import dev.gomoku.zenyth.core.designsystem.theme.RowNoteStyle
 import dev.gomoku.zenyth.core.designsystem.theme.RowTitleStyle
-import dev.gomoku.zenyth.core.designsystem.theme.proMode
 import dev.gomoku.zenyth.core.designsystem.theme.LocalProMode
 import dev.gomoku.zenyth.core.designsystem.theme.ZenythTheme
 import dev.gomoku.zenyth.core.designsystem.component.rememberCalmFling
@@ -140,6 +140,8 @@ fun SettingsScreen(
         onHash = viewModel::onLocalHash,
         onDatabase = viewModel::onLocalDatabase,
         onServerEnabled = viewModel::onServerEnabled,
+        onLocalMode = viewModel::onLocalMode,
+        onEndpoint = viewModel::onEndpoint,
         onImport = { file ->
             viewModel.prepare(file)
             importLauncher.launch(arrayOf("*/*"))
@@ -268,7 +270,11 @@ internal fun LocalEngineCard(
         }
         row {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(tr("기기 데이터베이스 사용", "Use the device database", "使用本机数据库"), style = RowTitleStyle, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text(tr("DB 사용", "Use the database", "使用数据库"), style = RowTitleStyle)
+                    // The library's attached entry (L5-4) — chosen in the library.
+                    Hint(ui.localDbTitle ?: tr("라이브러리에서 고른 DB", "The one picked in the library", "在资料库中选择的数据库"))
+                }
                 ZenythSwitch(checked = ui.localProfile.useDatabase, onCheckedChange = onDatabase)
             }
             // yixindb is read whole into the engine's memory, on top of the table (T3).
@@ -278,14 +284,14 @@ internal fun LocalEngineCard(
                 if (dbBytes >= ui.localDbWarnBytes) {
                     Hint(
                         tr(
-                            "rapfi.db ${mb} MB · 엔진이 그만큼 메모리를 더 씀",
-                            "rapfi.db $mb MB · the engine holds it all in memory",
-                            "rapfi.db $mb MB · 引擎会多占这么多内存",
+                            "${mb} MB · 엔진이 그만큼 메모리를 더 씀",
+                            "$mb MB · the engine holds it all in memory",
+                            "$mb MB · 引擎会多占这么多内存",
                         ),
                         color = MaterialTheme.colorScheme.error,
                     )
                 } else {
-                    Hint(tr("rapfi.db ${mb} MB", "rapfi.db $mb MB", "rapfi.db $mb MB"))
+                    Hint("$mb MB")
                 }
             }
         }
@@ -298,6 +304,76 @@ internal fun LocalEngineCard(
                 ZenythSwitch(checked = ui.serverEnabled, onCheckedChange = onServerEnabled)
             }
             if (!ui.localMode) Hint(tr("지금은 서버 엔진을 씁니다", "The server engine is in use", "当前正在使用服务器引擎"))
+        }
+    }
+}
+
+/**
+ * Which engine, and where the server is (L5-5: the engine tab's top half). The
+ * two are not the same tool — on-device is always there but holds a small
+ * hash, the server is the deep one — and choosing is only allowed while nothing
+ * is connected: swapping engines mid-session would leave the board talking to
+ * the wrong one. The board's «로그» pane starts and stops whichever is chosen.
+ */
+@Composable
+internal fun ServerEngineCard(
+    ui: SettingsUiState,
+    onLocalMode: (Boolean) -> Unit,
+    onEndpoint: (host: String, port: String) -> Unit,
+) {
+    ConnectedGroup(title = tr("연결할 엔진", "Engine to use", "要连接的引擎")) {
+        row {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                ZenythFilterChip(
+                    selected = ui.localMode,
+                    onClick = { onLocalMode(true) },
+                    enabled = !ui.connected,
+                    label = { Text(tr("기기 내 엔진", "On-device", "本机引擎")) },
+                )
+                ZenythFilterChip(
+                    selected = !ui.localMode,
+                    onClick = { onLocalMode(false) },
+                    enabled = !ui.connected,
+                    label = { Text(tr("서버", "Server", "服务器")) },
+                )
+            }
+            if (ui.connected) {
+                Hint(tr("엔진을 끈 뒤 바꿉니다 · 보드 ▸ 로그", "Stop the engine to change it · Board ▸ Log", "关闭引擎后才能更改 · 棋盘 ▸ 日志"))
+            }
+        }
+        row {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                CommitField(
+                    value = ui.endpoint.host,
+                    onCommit = { host -> onEndpoint(host, ui.endpoint.port.toString()) },
+                    keyboard = KeyboardType.Uri,
+                    modifier = Modifier.weight(1f),
+                    // There is no default address — the server is the user's own.
+                    supporting = tr("서버 (Tailscale) · 예: 100.x.y.z", "Server (Tailscale) · e.g. 100.x.y.z", "服务器 (Tailscale) · 例: 100.x.y.z"),
+                )
+                CommitField(
+                    value = ui.endpoint.port.toString(),
+                    onCommit = { port -> onEndpoint(ui.endpoint.host, port) },
+                    keyboard = KeyboardType.Number,
+                    modifier = Modifier.width(96.dp),
+                    supporting = tr("포트", "Port", "端口"),
+                )
+            }
+            // The server link is plain TCP (piskvork has no encryption); only
+            // Tailscale's WireGuard tunnel protects it. Read from the text alone,
+            // no lookup (EndpointReach).
+            if (ui.plaintextWarning) {
+                Hint(
+                    tr(
+                        "Tailscale 이나 사설망 주소가 아닌 것 같습니다. 서버 엔진 연결은 암호화되지 않아, 오가는 국면과 명령이 경로 위에서 그대로 보입니다.",
+                        "This does not look like a Tailscale or private-network address. The server engine link is not encrypted: positions and commands cross the network in the clear.",
+                        "这似乎不是 Tailscale 或局域网地址。服务器引擎连接不加密，局面和命令会以明文在网络上传输。",
+                    ),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else if (ui.serverChosen && !ui.endpoint.isConfigured) {
+                Hint(tr("주소를 넣어야 서버 엔진을 시작합니다", "The server engine starts once it has an address", "填写地址后才能启动服务器引擎"), color = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }

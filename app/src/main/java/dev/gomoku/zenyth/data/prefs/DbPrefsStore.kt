@@ -1,7 +1,6 @@
 package dev.gomoku.zenyth.data.prefs
 
 import android.content.Context
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -20,25 +19,21 @@ private val Context.dbDataStore by preferencesDataStore(name = "database")
  * desktop's `settings.txt`/`settings_dev.txt` (47 + 20), and adding a field
  * there would break the codec's round-trip.
  *
- * Holds the destructive-operation unlock (plan §7 decision 1) and the last
- * server-side paths, so the file dialogs do not start empty every time.
+ * Holds the last server-side path, so the file dialogs do not start empty
+ * every time. The destructive-operation unlock is expert mode now (L5-5,
+ * design §9-2): the old `destructive_unlocked` key is left unread.
  */
 @Singleton
 class DbPrefsStore @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val ui: UiPrefs,
 ) : DbPreferences {
-    private val unlockKey = booleanPreferencesKey("destructive_unlocked")
     private val lastPathKey = stringPreferencesKey("last_path")
 
-    override val destructiveUnlocked: Flow<Boolean> =
-        context.dbDataStore.data.map { it[unlockKey] ?: false }
+    override val destructiveUnlocked: Flow<Boolean> get() = ui.proMode.state
 
     override val lastPath: Flow<String> =
         context.dbDataStore.data.map { it[lastPathKey] ?: DEFAULT_PATH }
-
-    override suspend fun setDestructiveUnlocked(on: Boolean) {
-        context.dbDataStore.edit { it[unlockKey] = on }
-    }
 
     override suspend fun setLastPath(path: String) {
         context.dbDataStore.edit { it[lastPathKey] = path }

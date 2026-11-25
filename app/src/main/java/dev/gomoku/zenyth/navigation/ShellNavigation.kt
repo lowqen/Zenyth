@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -18,16 +16,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import dev.gomoku.zenyth.core.designsystem.component.engineWord
-import dev.gomoku.zenyth.core.model.ConnectionState
 
 /**
- * The six tabs along the bottom — a phone held upright.
+ * The five tabs along the bottom — a phone held upright.
  *
  * Stateless: the shell owns the back stack and hands in what is selected, so
  * the bar can be drawn (and photographed) without one.
@@ -38,7 +32,6 @@ import dev.gomoku.zenyth.core.model.ConnectionState
 @Composable
 fun ZenythBottomBar(
     selected: Destination?,
-    connection: ConnectionState,
     onSelect: (Destination) -> Unit,
     modifier: Modifier = Modifier,
     destinations: List<Destination> = Destination.entries,
@@ -48,7 +41,7 @@ fun ZenythBottomBar(
             NavigationBarItem(
                 selected = dest == selected,
                 onClick = { onSelect(dest) },
-                icon = { DestinationIcon(dest, connection, dest == selected) },
+                icon = { DestinationIcon(dest, dest == selected) },
                 label = { DestinationLabel(dest, dest == selected) },
             )
         }
@@ -56,11 +49,11 @@ fun ZenythBottomBar(
 }
 
 /**
- * The same six tabs down the side — anything at least [RailLayoutMin] wide,
+ * The same five tabs down the side — anything at least [RailLayoutMin] wide,
  * which includes every phone on its side. There the height is the scarce side,
  * and the board is sized by it.
  *
- * Six items with labels need about 380dp; a phone on its side has less than
+ * Five items with labels need about 330dp; a phone on its side has less than
  * that under the status bar, so the column scrolls rather than clip the last
  * tab, and [showLabels] false (short windows) keeps only the selected label.
  * Its tabs follow the bar's rule — filled and bold when chosen, outlined when not.
@@ -68,7 +61,6 @@ fun ZenythBottomBar(
 @Composable
 fun ZenythRail(
     selected: Destination?,
-    connection: ConnectionState,
     onSelect: (Destination) -> Unit,
     modifier: Modifier = Modifier,
     showLabels: Boolean = true,
@@ -86,7 +78,7 @@ fun ZenythRail(
                 NavigationRailItem(
                     selected = dest == selected,
                     onClick = { onSelect(dest) },
-                    icon = { DestinationIcon(dest, connection, dest == selected) },
+                    icon = { DestinationIcon(dest, dest == selected) },
                     label = { DestinationLabel(dest, dest == selected) },
                     alwaysShowLabel = showLabels,
                 )
@@ -95,25 +87,14 @@ fun ZenythRail(
     }
 }
 
-/** The dot rides the tab that leads to the answer: the engine's state on 엔진. */
+/**
+ * The tab's icon, and nothing on it: the engine's dot rode the engine tab, and
+ * with that tab gone (L5-5) the top bar's engine chip says it on every screen —
+ * Zenyth Web took the rail's dot away the same way.
+ */
 @Composable
-private fun DestinationIcon(dest: Destination, connection: ConnectionState, selected: Boolean) {
-    val icon = if (selected) dest.selectedIcon else dest.icon
-    if (dest == Destination.Connect) {
-        val (word, color) = engineWord(connection)
-        BadgedBox(
-            badge = {
-                Badge(
-                    containerColor = color,
-                    modifier = Modifier.semantics { contentDescription = word },
-                )
-            },
-        ) {
-            Icon(icon, contentDescription = null)
-        }
-    } else {
-        Icon(icon, contentDescription = null)
-    }
+private fun DestinationIcon(dest: Destination, selected: Boolean) {
+    Icon(if (selected) dest.selectedIcon else dest.icon, contentDescription = null)
 }
 
 @Composable

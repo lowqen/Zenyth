@@ -8,7 +8,7 @@ package dev.gomoku.zenyth.core.model
  * (the engine's side is not changed for this). Privacy on that link is
  * therefore the network's: Tailscale encrypts it end to end (WireGuard), a home
  * network at least keeps it off the internet, and anything else sends every
- * position and command in the clear. The connection tab warns on [PUBLIC]
+ * position and command in the clear. Settings ▸ 엔진 warns on [PUBLIC]
  * (docs/engineering-notes.md §4 S11).
  */
 enum class EndpointReach {

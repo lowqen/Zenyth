@@ -2,11 +2,16 @@ package dev.gomoku.zenyth.feature.connection
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.gomoku.zenyth.core.model.ConnectionState
+import dev.gomoku.zenyth.core.model.EngineCapabilities
 import dev.gomoku.zenyth.core.model.EngineEndpoint
 import dev.gomoku.zenyth.core.model.EngineTarget
 import dev.gomoku.zenyth.core.model.FontSpec
 import dev.gomoku.zenyth.core.model.LinkHealth
+import dev.gomoku.zenyth.core.model.LocalEngineProfile
+import dev.gomoku.zenyth.data.library.AttachedDbStore
 import dev.gomoku.zenyth.data.prefs.EndpointStore
+import dev.gomoku.zenyth.data.prefs.LocalEngineStore
 import dev.gomoku.zenyth.domain.engine.EngineCommand
 import dev.gomoku.zenyth.domain.repository.EngineRepository
 import dev.gomoku.zenyth.domain.repository.SettingsRepository
@@ -15,66 +20,82 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * The board's «로그» pane (L5-5) — what the engine tab did, minus choosing the
+ * engine (Settings ▸ 엔진 now). Made by the board screen itself, not by the pane,
+ * so the console holds what the engine said since the board opened and not only
+ * since the pane was first looked at.
+ */
 @HiltViewModel
 class ConnectionViewModel @Inject constructor(
     private val repository: EngineRepository,
     private val endpointStore: EndpointStore,
+    localEngineStore: LocalEngineStore,
     settingsRepository: SettingsRepository,
+    private val attachedDb: AttachedDbStore,
 ) : ViewModel() {
 
-    private val host = MutableStateFlow(EngineEndpoint.DEFAULT_HOST)
-    private val port = MutableStateFlow(EngineEndpoint.DEFAULT_PORT.toString())
-    private val localMode = MutableStateFlow(true)
     private val draft = MutableStateFlow("")
     private val consoleLines = MutableStateFlow(ConsoleBuffer())
+    private val dbTitle = MutableStateFlow<String?>(null)
 
-    /** Everything about *where* the engine is, as one value. */
+    /** Where the engine is, as one value: combine takes five flows at most. */
     private data class Link(
-        val host: String,
-        val port: String,
         val local: Boolean,
         val serverEnabled: Boolean,
+        val endpoint: EngineEndpoint,
         val health: LinkHealth,
+        val state: ConnectionState,
     )
 
-    // combine takes five flows at most, so the endpoint fields, the chosen
-    // engine and the link state travel together as one.
+    /** What «세부 수치» reads. */
+    private data class Detail(
+        val profile: LocalEngineProfile,
+        val thermal: Int?,
+        val caps: EngineCapabilities,
+        val db: String?,
+    )
+
     private val link = combine(
-        host,
-        port,
-        localMode,
+        endpointStore.localMode,
         endpointStore.serverEnabled,
+        endpointStore.endpoint,
         repository.health,
-    ) { h, p, local, serverEnabled, health ->
-        Link(h, p, local, serverEnabled, health)
-    }
+        repository.state,
+    ) { local, serverEnabled, endpoint, health, state -> Link(local, serverEnabled, endpoint, health, state) }
+
+    private val detail = combine(
+        localEngineStore.profile,
+        repository.thermalThreads,
+        repository.capabilities,
+        dbTitle,
+    ) { profile, thermal, caps, db -> Detail(profile, thermal, caps, db) }
 
     val uiState: StateFlow<ConnectionUiState> =
-        combine(
-            link,
-            repository.state,
-            consoleLines,
-            draft,
-            settingsRepository.settings,
-        ) { l, st, buffer, d, config ->
+        combine(link, detail, consoleLines, draft, settingsRepository.settings) { l, d, buffer, text, config ->
             ConnectionUiState(
-                host = l.host,
-                port = l.port,
                 localMode = l.local,
                 serverEnabled = l.serverEnabled,
-                state = st,
+                endpoint = l.endpoint,
+                state = l.state,
                 health = l.health,
                 console = buffer.lines,
-                commandDraft = d,
+                commandDraft = text,
                 showLog = config.showLog,
                 logScalePercent = config.logScale,
                 logFont = FontSpec.parse(config.textLogFont),
+                profile = d.profile,
+                thermalThreads = d.thermal,
+                capabilities = d.caps,
+                dbTitle = d.db,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -84,49 +105,42 @@ class ConnectionViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val saved = endpointStore.endpoint.first()
-            host.value = saved.host
-            port.value = saved.port.toString()
-            localMode.value = endpointStore.localMode.first()
-        }
-        viewModelScope.launch {
             repository.console.collect { line ->
                 consoleLines.update { it.plus(line) }
             }
         }
+        // The attached entry changes with the library (L5-4 switches it with the
+        // engine up); every change of the engine's state is a cheap time to look.
+        viewModelScope.launch {
+            repository.state.map { it.isLive }.distinctUntilChanged().collect {
+                dbTitle.value = runCatching { attachedDb.attachedTitle() }.getOrNull()
+            }
+        }
     }
-
-    fun onHostChange(value: String) { host.value = value.trim() }
-
-    fun onPortChange(value: String) { port.value = value.filter(Char::isDigit).take(5) }
-
-    fun onLocalModeChange(local: Boolean) { localMode.value = local }
 
     fun onDraftChange(value: String) { draft.value = value }
 
+    /** Start whichever engine Settings ▸ 엔진 chose — the shell's start, from here. */
     fun onConnect() {
-        val endpoint = EngineEndpoint(
-            host = host.value.trim(),
-            port = port.value.toIntOrNull() ?: EngineEndpoint.DEFAULT_PORT,
-        )
-        // `localMode` already reflects the gate (the store forces it while the
-        // server engine is off), but reading the state rather than the field
-        // keeps the two from disagreeing if the switch flips mid-tap.
-        val local = localMode.value || !uiState.value.serverEnabled
-        // No default server address: a blank one would resolve to this phone.
-        // The button is off then; this covers a tap that raced the typing.
-        if (!local && !endpoint.isConfigured) return
-        val target = if (local) EngineTarget.Local else EngineTarget.Remote(endpoint)
         viewModelScope.launch {
-            // The address is saved either way: choosing the on-device engine is
-            // not a decision to forget the server.
-            endpointStore.save(target, endpoint)
+            val local = endpointStore.localMode.first()
+            val endpoint = endpointStore.endpoint.first()
+            // No default server address: a blank one would resolve to this phone.
+            // The button is off then; this covers a tap that raced the settings.
+            if (!local && !endpoint.isConfigured) return@launch
+            val target = if (local) EngineTarget.Local else EngineTarget.Remote(endpoint)
             runCatching { repository.connect(target) }
         }
     }
 
     fun onDisconnect() {
         repository.disconnect()
+    }
+
+    /** `YXHASHCLEAR` once, now — a one-off, so beside the engine rather than in a list of settings. */
+    fun onHashClear() {
+        if (repository.state.value != ConnectionState.Ready) return
+        viewModelScope.launch { runCatching { repository.send(EngineCommand.YxHashClear) } }
     }
 
     fun onSend() {

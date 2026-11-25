@@ -28,12 +28,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gomoku.zenyth.core.designsystem.component.BoardRender
 import dev.gomoku.zenyth.core.designsystem.component.GomokuBoard
 import dev.gomoku.zenyth.core.designsystem.component.LocalSnackbarHostState
+import dev.gomoku.zenyth.core.designsystem.component.LocalUiPrefs
+import dev.gomoku.zenyth.feature.connection.ConnectionViewModel
+import dev.gomoku.zenyth.feature.connection.EngineLogPane
+import kotlinx.coroutines.flow.MutableStateFlow
 import dev.gomoku.zenyth.core.designsystem.component.rememberZenythHaptics
 import dev.gomoku.zenyth.core.designsystem.component.renderBoardPng
 import dev.gomoku.zenyth.core.designsystem.theme.ZenythTheme
@@ -62,17 +67,36 @@ import kotlinx.coroutines.flow.first
  *
  *  - Analysis: engine card (best move first, frozen after a stop), evaluation
  *    graph, analysis settings (folded), position, tools. The database's
- *    per-position actions live in the DB tab (Zenyth Web's layout); the board
+ *    per-position actions live in the library's editor (Zenyth Web's layout); the board
  *    keeps only the long press that writes a cell label.
  *  - Game: the game card (status, «지금 두기», colours, time, level, rules),
  *    then the position with resign and draw. No analysis overlay on the board.
+ *
+ * Over the cards, [개요 | 로그] (L5-5): «로그» is the engine's state line and
+ * console, where the engine tab was ([EngineLogPane]).
  */
 @Composable
 fun BoardScreen(
     modifier: Modifier = Modifier,
     viewModel: BoardViewModel = hiltViewModel(),
+    /**
+     * The «로그» pane's view model — made by the shell with the board, so the
+     * console has held every line since the board opened. Null where there is
+     * no Hilt (the screenshot and recomposition tests): the pane is then empty.
+     */
+    engineLog: ConnectionViewModel? = null,
 ) {
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
+    // [개요 | 로그], remembered across launches; the old engine route sets it too.
+    val prefs = LocalUiPrefs.current
+    val logPref = remember(prefs) { prefs?.boardLogPane }
+    val logFallback = remember { MutableStateFlow(false) }
+    val showLog by (logPref?.state ?: logFallback).collectAsStateWithLifecycle()
+    val onPane: (Boolean) -> Unit = { on ->
+        logFallback.value = on
+        logPref?.set(on)
+    }
+    val logPane: @Composable (Modifier) -> Unit = { mod -> engineLog?.let { EngineLogPane(it, mod) } }
     // What the eval bar, the sheet's wave and the clock row read, each changing
     // only when its own value does. Read through the whole state, every engine
     // line or clock tick composed all three again.
@@ -272,6 +296,9 @@ fun BoardScreen(
                 toolbar = toolbar,
                 summary = { SummaryStrip(ui.summaryUi()) },
                 cards = { cards(true) },
+                paneTabs = { BoardPaneTabs(showLog, onPane) },
+                showLog = showLog,
+                logPane = logPane,
             )
         } else {
             BoardPortrait(
@@ -283,6 +310,9 @@ fun BoardScreen(
                 toolbar = toolbar,
                 summary = { SummaryStrip(ui.summaryUi()) },
                 cards = { cards(width >= 600.dp) },
+                paneTabs = { BoardPaneTabs(showLog, onPane, Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) },
+                showLog = showLog,
+                logPane = logPane,
             )
         }
     }

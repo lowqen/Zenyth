@@ -89,6 +89,8 @@ internal class SettingsActions(
     val onHash: (Int) -> Unit = {},
     val onDatabase: (Boolean) -> Unit = {},
     val onServerEnabled: (Boolean) -> Unit = {},
+    val onLocalMode: (Boolean) -> Unit = {},
+    val onEndpoint: (host: String, port: String) -> Unit = { _, _ -> },
     val onImport: (SettingsFile) -> Unit = {},
     val onExport: (SettingsFile) -> Unit = {},
     val onFolder: () -> Unit = {},
@@ -169,8 +171,11 @@ private fun SectionsBuilder.rootSections(ui: SettingsUiState, actions: SettingsA
                 LinkRow(
                     SettingsPage.Engine.icon,
                     SettingsPage.Engine.title,
-                    if (pro) tr("스레드 · 해시 · 기기 DB · 서버", "Threads, hash, device DB, server", "线程 · 哈希 · 本机数据库 · 服务器")
-                    else tr("스레드 수", "Threads", "线程数"),
+                    when {
+                        pro -> tr("스레드 · 해시 · DB · 서버", "Threads, hash, DB, server", "线程 · 哈希 · 数据库 · 服务器")
+                        ui.serverEnabled -> tr("스레드 수 · 서버 주소", "Threads, server address", "线程数 · 服务器地址")
+                        else -> tr("스레드 수", "Threads", "线程数")
+                    },
                 )
             }
             row(onClick = { actions.onOpen(SettingsPage.Data) }) {
@@ -184,7 +189,7 @@ private fun SectionsBuilder.rootSections(ui: SettingsUiState, actions: SettingsA
                 LinkRow(
                     Icons.Outlined.Science,
                     tr("고급 사용자 모드", "Expert mode", "高级用户模式"),
-                    tr("DB 탭 · 엔진 콘솔 · 도구 · PC 설정 ${ui.total}개", "DB tab, engine console, tools, ${ui.total} PC settings", "数据库页 · 引擎控制台 · 工具 · ${ui.total} 项 PC 设置"),
+                    tr("일괄 삭제 · 콘솔 입력 · 엔진 도구 · 파라미터 · PC 설정 ${ui.total}개", "Bulk delete, console input, engine tools, parameters, ${ui.total} PC settings", "批量删除 · 控制台输入 · 引擎工具 · 参数 · ${ui.total} 项 PC 设置"),
                 ) { ZenythSwitch(checked = pro, onCheckedChange = actions.onPro) }
             }
             if (pro) {
@@ -229,8 +234,9 @@ private fun appEntries(pro: Boolean): List<AppEntry> = buildList {
     add(AppEntry(SettingsPage.Engine, tr("스레드 수", "Threads", "线程数"), "스레드 threads"))
     if (pro) {
         add(AppEntry(SettingsPage.Engine, tr("해시 크기 (MB)", "Hash size (MB)", "哈希表大小 (MB)"), "해시 hash memory 메모리"))
-        add(AppEntry(SettingsPage.Engine, tr("기기 데이터베이스 사용", "Use the device database", "使用本机数据库"), "rapfi.db database 데이터베이스"))
+        add(AppEntry(SettingsPage.Engine, tr("DB 사용", "Use the database", "使用数据库"), "rapfi.db database 데이터베이스 라이브러리 library"))
         add(AppEntry(SettingsPage.Engine, tr("서버 엔진 사용", "Use a server engine", "使用服务器引擎"), "server 서버 tailscale"))
+        add(AppEntry(SettingsPage.Engine, tr("서버 주소", "Server address", "服务器地址"), "server host port 주소 포트 tailscale 연결 connect"))
         add(AppEntry(SettingsPage.Desktop, tr("데스크톱 설정 파일", "Desktop settings files", "桌面版设置文件"), "settings.txt 가져오기 내보내기 import export"))
         add(AppEntry(SettingsPage.Desktop, tr("PC 기본값으로 되돌리기", "Back to the PC defaults", "恢复 PC 默认值"), "reset 초기화"))
     }
@@ -345,6 +351,12 @@ private fun SectionsBuilder.engineSections(ui: SettingsUiState, actions: Setting
         section("local") {
             LocalEngineCard(ui = ui, onHash = actions.onHash, onDatabase = actions.onDatabase, onServerEnabled = actions.onServerEnabled)
         }
+    }
+    // Which engine and the server's address — the engine tab's top half until
+    // L5-5. Shown whenever the server is offered, expert mode or not: without it
+    // there would be no way back to the on-device engine.
+    if (ui.serverEnabled) {
+        section("server") { ServerEngineCard(ui = ui, onLocalMode = actions.onLocalMode, onEndpoint = actions.onEndpoint) }
     }
 }
 // ---- 데이터 ----------------------------------------------------------------------------

@@ -116,9 +116,6 @@ class DatabaseRepositoryTest {
     private class FakePrefs(unlocked: Boolean = false) : DbPreferences {
         override val destructiveUnlocked = MutableStateFlow(unlocked)
         override val lastPath = MutableStateFlow("rapfi.db")
-        override suspend fun setDestructiveUnlocked(on: Boolean) {
-            destructiveUnlocked.value = on
-        }
 
         override suspend fun setLastPath(path: String) {
             lastPath.value = path

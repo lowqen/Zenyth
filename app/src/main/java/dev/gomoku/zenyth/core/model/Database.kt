@@ -250,7 +250,7 @@ data class DbState(
     val enabled: Boolean = true,
     /** `info database_readonly` (line 33) — blocks every write path. */
     val readOnly: Boolean = false,
-    /** Bulk deletes and split stay locked until the user opts in (plan §7-1). */
+    /** Bulk deletes and split — «고급 사용자 모드» (plan §7-1, L5-5). */
     val destructiveUnlocked: Boolean = false,
     val snapshot: DbSnapshot = DbSnapshot(),
     /** Position value derived from [snapshot], only for a paired query reply. */

@@ -72,9 +72,9 @@ import javax.inject.Singleton
  *    carries DB1 · DB4 and saves beside a search without stopping it;
  *  - **read-only**: every write path is refused client-side too, not just by
  *    the engine, so the UI can explain why nothing happened;
- *  - **destructive ops locked**: bulk deletes and split need an explicit opt-in
- *    (plan §7 decision 1). The engine has no undo and the file is shared with
- *    the PC.
+ *  - **destructive ops locked**: bulk deletes and split need «고급 사용자 모드»
+ *    (plan §7 decision 1; since L5-5 the mode, not a switch of their own). The
+ *    engine has no undo and the file is shared with the PC.
  */
 @Singleton
 class DatabaseRepositoryImpl @Inject constructor(
@@ -543,7 +543,6 @@ class DatabaseRepositoryImpl @Inject constructor(
         settings.set("databaseReadonly", if (on) "1" else "0")
     }
 
-    override suspend fun setDestructiveUnlocked(on: Boolean) = prefs.setDestructiveUnlocked(on)
 
     // ---- plumbing ----------------------------------------------------------
 
@@ -584,7 +583,7 @@ class DatabaseRepositoryImpl @Inject constructor(
         if (!current.enabled) return DbOpResult.Refused(tr("데이터베이스 사용이 꺼져 있습니다", "The database is turned off", "数据库未开启"))
         if (write && current.readOnly) return DbOpResult.Refused(tr("읽기 전용 상태입니다", "The database is read-only", "数据库处于只读模式"))
         if (destructive && !current.destructiveUnlocked) {
-            return DbOpResult.Refused(tr("파괴적 연산이 잠겨 있습니다 (설정에서 해제)", "Destructive operations are locked (unlock them in settings)", "破坏性操作已锁定 (可在设置中解锁)"))
+            return DbOpResult.Refused(tr("일괄 삭제 · 분할은 고급 사용자 모드에서 합니다 (설정)", "Bulk delete and split need expert mode (Settings)", "批量删除 · 拆分需要高级用户模式 (设置)"))
         }
         block()
         return DbOpResult.Sent

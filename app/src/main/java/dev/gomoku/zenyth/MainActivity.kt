@@ -1,6 +1,5 @@
 package dev.gomoku.zenyth
 
-import dev.gomoku.zenyth.core.designsystem.theme.proMode
 import dev.gomoku.zenyth.core.designsystem.theme.LocalProMode
 import android.content.Intent
 import android.graphics.Color

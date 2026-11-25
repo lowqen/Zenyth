@@ -84,8 +84,6 @@ class DatabaseViewModel @Inject constructor(
 
     fun onReadOnly(on: Boolean) = inScope { repository.setReadOnly(on) }
 
-    fun onUnlockDestructive(on: Boolean) = inScope { repository.setDestructiveUnlocked(on) }
-
     fun onAutoSave(on: Boolean) = inScope { settings.set("dbAutoSave", if (on) "1" else "0") }
 
     fun onAutoSaveMinutes(minutes: Int) = inScope {

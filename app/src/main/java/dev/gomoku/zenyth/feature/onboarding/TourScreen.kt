@@ -40,6 +40,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material3.MaterialTheme
@@ -79,7 +80,11 @@ import kotlinx.coroutines.launch
  */
 val LocalOpenTour: ProvidableCompositionLocal<(() -> Unit)?> = staticCompositionLocalOf { null }
 
-/** The four places the tour shows, in the bottom bar's order. */
+/**
+ * The four places the tour shows, in the bottom bar's order — the engine last,
+ * though since L5-5 it is not a tab: its place is the board sheet's «로그» pane
+ * and Settings ▸ 엔진. (The library gets its page with its screen, L5-6.)
+ */
 enum class TourPage { Board, Research, Joseki, Engine }
 
 /**
@@ -228,8 +233,10 @@ private fun TourPageBody(page: TourPage) {
                         EnginePicture()
                         Spacer(Modifier.height(28.dp))
                         Rows(
+                            Triple(Icons.Outlined.Terminal, tr("보드의 «로그»", "The board's Log", "棋盘的「日志」"),
+                                tr("보드 시트의 [개요 | 로그] 에서 엔진 상태와 주고받은 말을 봅니다", "Overview | Log on the board's sheet shows the engine's state and what it said", "在棋盘面板的［概览 | 日志］中查看引擎状态与往来信息")),
                             Triple(Icons.Outlined.Computer, tr("내 PC 엔진", "Your PC's engine", "电脑上的引擎"),
-                                tr("엔진 탭에서 PC 에서 도는 엔진 서버에 연결할 수도 있습니다", "The engine tab can also connect to an engine server on your PC", "也可以在引擎页连接电脑上运行的引擎服务器")),
+                                tr("설정 ▸ 엔진에서 PC 에서 도는 엔진 서버에 연결할 수도 있습니다", "Settings ▸ Engine can also connect to an engine server on your PC", "也可以在 设置 ▸ 引擎 中连接电脑上运行的引擎服务器")),
                             Triple(Icons.Outlined.Thermostat, tr("발열 · 절전", "Heat · battery saver", "发热 · 省电"),
                                 tr("폰이 뜨겁거나 절전 중이면 스레드를 줄여 버팁니다", "A hot phone or battery saver makes it run on fewer threads", "手机发热或省电时会减少线程继续运行")),
                         )

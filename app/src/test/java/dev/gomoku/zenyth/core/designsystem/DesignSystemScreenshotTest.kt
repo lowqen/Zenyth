@@ -74,6 +74,11 @@ import dev.gomoku.zenyth.core.model.TagKind
 import dev.gomoku.zenyth.feature.board.AnalysisCard
 import dev.gomoku.zenyth.feature.board.BoardLandscape
 import dev.gomoku.zenyth.feature.board.BoardModeSwitch
+import dev.gomoku.zenyth.feature.board.BoardPaneTabs
+import dev.gomoku.zenyth.feature.connection.ConnectionUiState
+import dev.gomoku.zenyth.feature.connection.EngineLogContent
+import dev.gomoku.zenyth.core.model.ConsoleLine
+import dev.gomoku.zenyth.core.model.EngineEndpoint
 import dev.gomoku.zenyth.feature.board.BoardPortrait
 import dev.gomoku.zenyth.feature.board.BoardUiState
 import dev.gomoku.zenyth.feature.board.EvalView
@@ -181,11 +186,21 @@ class DesignSystemScreenshotTest(private val variant: Variant) {
         portrait(sheetUp = false)
     }
 
-    /** The same, the sheet pulled up over the board. */
+    /** The same, the sheet pulled up over the board — [개요 | 로그] under the summary (L5-5). */
     @Test
     fun boardPortraitSheet() {
         assumeTrue(variant.fontScale == 1f)
         screen("screen_board_sheet", 411.dp, 771.dp) { portrait(sheetUp = true) }
+    }
+
+    /**
+     * The sheet on «로그» (L5-5, where the engine tab was): the state line with
+     * start/stop and «해시 비우기», the folded figures, the tools fold and the
+     * console with the command line (expert mode, as tests run).
+     */
+    @Test
+    fun boardPortraitLog() = screen("screen_board_log", 411.dp, 771.dp) {
+        portrait(sheetUp = true, log = true)
     }
 
     /** On its side, beside the rail: board at full height, cards on the right. */
@@ -209,7 +224,7 @@ class DesignSystemScreenshotTest(private val variant: Variant) {
     }
 
     @Composable
-    private fun portrait(sheetUp: Boolean) {
+    private fun portrait(sheetUp: Boolean, log: Boolean = false) {
         BoardPortrait(
             ui = analysing,
             board = { mod -> GomokuBoard(render = sampleRender, modifier = mod) },
@@ -222,8 +237,26 @@ class DesignSystemScreenshotTest(private val variant: Variant) {
                 PositionCard(analysing, noFiles, onResign = {}, onDraw = {})
             },
             sheetUp = sheetUp,
+            paneTabs = { BoardPaneTabs(log, onSelect = {}, Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) },
+            showLog = log,
+            logPane = { mod -> EngineLogContent(sampleLog, mod) },
         )
     }
+
+    /** The engine as the log pane reads it a few moves into an analysis. */
+    private val sampleLog = ConnectionUiState(
+        state = ConnectionState.Thinking,
+        dbTitle = "내 DB",
+        console = listOf(
+            ConsoleLine(outbound = true, text = "START 15"),
+            ConsoleLine(outbound = false, text = "OK"),
+            ConsoleLine(outbound = true, text = "BOARD"),
+            ConsoleLine(outbound = true, text = "7,7,2"),
+            ConsoleLine(outbound = true, text = "DONE"),
+            ConsoleLine(outbound = false, text = "MESSAGE DEPTH 18-24 EV 85 N 12.3M NPS 2.1M TM 5.8s PV h8 i9 g7"),
+            ConsoleLine(outbound = false, text = "8,9"),
+        ),
+    )
 
     @Composable
     private fun toolbar(ui: BoardUiState) = MoveToolbar(
@@ -401,9 +434,21 @@ class DesignSystemScreenshotTest(private val variant: Variant) {
     @Test
     fun settingsGeneral() = shot("settings_general") { SettingsPageShot(SettingsPage.General, SettingsUiState()) }
 
-    /** 엔진: the thread chips and the on-device engine's own group (M3). */
+    /** 엔진: the thread chips, the on-device engine's own group (M3) and — the server offered — which engine and where (L5-5). */
     @Test
-    fun settingsEngine() = shot("settings_engine") { SettingsPageShot(SettingsPage.Engine, SettingsUiState(advanced = true)) }
+    fun settingsEngine() = shot("settings_engine") {
+        SettingsPageShot(
+            SettingsPage.Engine,
+            SettingsUiState(
+                advanced = true,
+                serverEnabled = true,
+                localMode = false,
+                endpoint = EngineEndpoint(host = "100.64.0.9"),
+                localDbTitle = "내 DB",
+                localDbBytes = 12L shl 20,
+            ),
+        )
+    }
 
     /** A search finds an app setting a page down, and the desktop's entry of the same name (M3). */
     @Test
@@ -435,14 +480,14 @@ class DesignSystemScreenshotTest(private val variant: Variant) {
         )
     }
 
-    /** The six tabs: upright along the bottom, and down the side when wide (P2). */
+    /** The five tabs (L5-5): upright along the bottom, and down the side when wide (P2). */
     @Test
     fun shellNavigation() = shot("shell_nav") {
-        ZenythBottomBar(selected = Destination.Board, connection = ConnectionState.Thinking, onSelect = {})
+        ZenythBottomBar(selected = Destination.Board, onSelect = {})
         Row(Modifier.height(360.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             // A phone on its side: only the selected tab keeps its label.
-            ZenythRail(selected = Destination.Research, connection = ConnectionState.Ready, onSelect = {}, showLabels = false)
-            ZenythRail(selected = Destination.Research, connection = ConnectionState.Error("x"), onSelect = {})
+            ZenythRail(selected = Destination.Research, onSelect = {}, showLabels = false)
+            ZenythRail(selected = Destination.Library, onSelect = {})
         }
     }
 

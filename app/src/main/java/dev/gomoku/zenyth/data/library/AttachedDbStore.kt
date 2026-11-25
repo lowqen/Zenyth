@@ -91,6 +91,22 @@ class AttachedDbStore(
     /** What the engine should open now — [AttachedDb.path], or null for the template's. */
     fun enginePath(): String? = attached()?.path
 
+    /**
+     * The attached entry's name as people read it — what settings and the board's
+     * log pane say instead of the file name (app storage files are `<uuid>.db`).
+     * App storage reads its manifest; a folder entry has only its staging mark
+     * here, whose file name is the next best thing. Null when nothing is attached.
+     */
+    suspend fun attachedTitle(): String? = withContext(Dispatchers.IO) {
+        val a = attached() ?: return@withContext null
+        val named = if (a.sourceId == AppDirSource.ID) {
+            runCatching { app.readManifest().entries.firstOrNull { it.id == a.entryId }?.title }.getOrNull()
+        } else {
+            markForEntry(a.entryId)?.name?.substringBeforeLast('.')
+        }
+        named ?: File(a.path).nameWithoutExtension
+    }
+
     // ── staging ────────────────────────────────────────────────────────
 
     fun stagingFile(key: String) = File(stagingDir, "$key.db")

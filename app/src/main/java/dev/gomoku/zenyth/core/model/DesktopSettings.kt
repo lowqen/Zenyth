@@ -192,7 +192,7 @@ object DesktopSettings {
         )
         bool(
             "showLog", "show log (0: no, 1: yes)", tr("로그", "Log", "日志"), SettingCategory.DISPLAY,
-            note = tr("연결 탭의 piskvork 원시 콘솔", "The raw piskvork console on the engine tab", "引擎页的 piskvork 原始控制台"),
+            note = tr("보드 «로그» 칸의 piskvork 원시 콘솔", "The raw piskvork console in the board's Log pane", "棋盘「日志」栏中的 piskvork 原始控制台"),
             get = { it.showLog }, set = { s, v -> s.copy(showLog = v) },
         )
         bool(
@@ -234,12 +234,12 @@ object DesktopSettings {
         )
         bool(
             "blockAutoReset", "block autoreset (0: no, 1: yes)", tr("차단 자동 해제", "Auto-reset blocks", "自动重置排除"),
-            SettingCategory.RESEARCH, note = tr("엔진 탭 도구에서 사용", "Used by the tools on the engine tab", "用于引擎页的工具"),
+            SettingCategory.RESEARCH, note = tr("보드 «로그» 칸의 도구에서 사용", "Used by the tools in the board's Log pane", "用于棋盘「日志」栏中的工具"),
             get = { it.blockAutoReset }, set = { s, v -> s.copy(blockAutoReset = v) },
         )
         bool(
             "blockPathAutoReset", "blockpath autoreset (0: no, 1: yes)", tr("차단 경로 자동 해제", "Auto-reset blocked paths", "自动重置排除路径"),
-            SettingCategory.RESEARCH, note = tr("엔진 탭 도구에서 사용", "Used by the tools on the engine tab", "用于引擎页的工具"),
+            SettingCategory.RESEARCH, note = tr("보드 «로그» 칸의 도구에서 사용", "Used by the tools in the board's Log pane", "用于棋盘「日志」栏中的工具"),
             get = { it.blockPathAutoReset }, set = { s, v -> s.copy(blockPathAutoReset = v) },
         )
         bool(

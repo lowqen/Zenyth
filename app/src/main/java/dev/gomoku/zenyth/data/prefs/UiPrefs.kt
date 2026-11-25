@@ -32,6 +32,24 @@ class UiPrefs @Inject constructor(
     val autoStartEngine: BoolPref get() = bool("engine.autostart", true)
 
     /**
+     * «고급 사용자 모드» — off by default (user request, 2026-10-29). Since L5-5 it
+     * guards **dangerous writes only**, as Zenyth Web decided: the DB editor's bulk
+     * delete (and the server-path split), the console's command line, the engine's
+     * tools and parameters (hash, server), the board's Tools card and the PC
+     * settings list. Every screen is there without it — the DB editor and the
+     * engine log too. It took over the DB screen's own «파괴적 연산 해제» switch.
+     * Read by the activity into `LocalProMode`, and by the database repository.
+     */
+    val proMode: BoolPref get() = bool("pro.enabled", false)
+
+    /**
+     * The board sheet shows [개요 | 로그] — true for «로그» (L5-5, Zenyth Web's
+     * `inspectorPane`). A pref rather than screen state: the old engine route
+     * opens the board on it, and it is remembered across launches like the web's.
+     */
+    val boardLogPane: BoolPref get() = bool("board.pane.log", false)
+
+    /**
      * Fetch the official joseki curriculum from Zenyth Web by itself. The app's one
      * automatic network request (a static file, nothing sent); off, the refresh
      * button and lesson links still fetch when asked.

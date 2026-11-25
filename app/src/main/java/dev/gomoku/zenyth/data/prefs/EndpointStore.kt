@@ -56,7 +56,7 @@ class EndpointStore @Inject constructor(
      *
      * It is not a feature most installs can use: it needs a Tailscale node, a
      * machine to run Rapfi on and an address only its owner knows. Offering it
-     * on the connection tab by default would put a dead option in front of
+     * in Settings ▸ 엔진 by default would put a dead option in front of
      * everyone, and a connection that fails for reasons the app cannot explain
      * reads as a broken app.
      */
@@ -76,7 +76,7 @@ class EndpointStore @Inject constructor(
         context.dataStore.edit { prefs ->
             prefs[serverEnabledKey] = on
             // Turning it off cannot leave the app pointed at an engine it will
-            // no longer offer — the connection tab would have no way back.
+            // no longer offer — Settings would have no way back.
             if (!on) prefs[localKey] = true
         }
     }

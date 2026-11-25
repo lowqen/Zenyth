@@ -4,6 +4,8 @@ import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.core.model.AppSettings
 import dev.gomoku.zenyth.core.model.DesktopSettings
 import dev.gomoku.zenyth.core.model.EngineCapabilities
+import dev.gomoku.zenyth.core.model.EndpointReach
+import dev.gomoku.zenyth.core.model.EngineEndpoint
 import dev.gomoku.zenyth.core.model.LocalEngineProfile
 import dev.gomoku.zenyth.core.model.SettingCategory
 import dev.gomoku.zenyth.core.model.SettingEditor
@@ -19,12 +21,16 @@ data class SettingsUiState(
     val localProfile: LocalEngineProfile = LocalEngineProfile(),
     /** Thread counts to offer — the fixed set plus this phone's own default. */
     val threadChoices: List<Int> = LocalEngineProfile.THREAD_CHOICES,
-    /** True while the on-device engine is the chosen one (connection tab). */
+    /** True while the on-device engine is the chosen one (Settings ▸ 엔진 since L5-5). */
     val localMode: Boolean = true,
     /** Whether the server engine is offered at all; advanced switch turns it on. */
     val serverEnabled: Boolean = false,
-    /** Absolute path of the device's own `rapfi.db`; empty until resolved. */
+    /** The saved server address (none typed = [EngineEndpoint.isConfigured] false). */
+    val endpoint: EngineEndpoint = EngineEndpoint(),
+    /** Absolute path of the engine's database — the attached library entry; empty until resolved. */
     val localDbPath: String = "",
+    /** The attached entry's name as people read it, or null before it is known. */
+    val localDbTitle: String? = null,
     /** Size of that file, null when there is none yet. Held whole in the engine's memory. */
     val localDbBytes: Long? = null,
     /** From this size on the database is worth a warning ([MemoryTier.databaseWarnBytes]). */
@@ -40,6 +46,16 @@ data class SettingsUiState(
     /** Transient result of an import/export/reset, shown as a banner. */
     val message: String? = null,
 ) {
+    /** The server engine is the one chosen. */
+    val serverChosen: Boolean get() = serverEnabled && !localMode
+
+    /**
+     * The server link is plain TCP; only Tailscale encrypts it. An address that
+     * is neither Tailscale nor a private network gets a warning under the field.
+     */
+    val plaintextWarning: Boolean
+        get() = serverChosen && EndpointReach.of(endpoint.host) == EndpointReach.PUBLIC
+
     /**
      * The specs to show, always in file order so line numbers read top-down.
      *

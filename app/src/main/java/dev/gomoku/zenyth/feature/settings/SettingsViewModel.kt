@@ -1,5 +1,7 @@
 package dev.gomoku.zenyth.feature.settings
 
+import dev.gomoku.zenyth.core.model.EngineTarget
+import dev.gomoku.zenyth.core.model.EngineEndpoint
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -71,6 +73,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             endpointStore.serverEnabled.collect { on -> _state.update { it.copy(serverEnabled = on) } }
         }
+        viewModelScope.launch {
+            endpointStore.endpoint.collect { e -> _state.update { it.copy(endpoint = e) } }
+        }
+        viewModelScope.launch {
+            val title = runCatching { attachedDb.attachedTitle() }.getOrNull()
+            _state.update { it.copy(localDbTitle = title) }
+        }
         // Where the device's own database ends up. Worth showing: it is the one
         // file of this app's the user might want to pull off the phone, and it
         // is nowhere a file manager will stumble on it. Since the library (L5-4)
@@ -108,11 +117,41 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * Offer the server engine, or stop offering it. Turning it off also points
-     * the app back at the on-device engine — the connection tab has no server
-     * chip to come back through once it is hidden.
+     * the app back at the on-device engine — there is no server chip to come
+     * back through once it is hidden.
      */
     fun onServerEnabled(on: Boolean) {
         viewModelScope.launch { endpointStore.setServerEnabled(on) }
+    }
+
+    /**
+     * The on-device engine or the server (L5-5: chosen here, not on the engine
+     * tab). Only while nothing is connected — swapping engines mid-session would
+     * leave the board talking to the wrong one; the screen greys it out then.
+     */
+    fun onLocalMode(local: Boolean) {
+        if (_state.value.connected) return
+        val endpoint = _state.value.endpoint
+        viewModelScope.launch {
+            endpointStore.save(if (local) EngineTarget.Local else EngineTarget.Remote(endpoint), endpoint)
+        }
+    }
+
+    /**
+     * The server address as typed — kept even while the on-device engine is
+     * chosen: picking local is not a decision to forget the server. A port
+     * that does not read as one keeps the old.
+     */
+    fun onEndpoint(host: String, port: String) {
+        val now = _state.value
+        val endpoint = EngineEndpoint(
+            host = host.trim(),
+            port = port.filter(Char::isDigit).take(5).toIntOrNull()?.takeIf { it in 1..65535 } ?: now.endpoint.port,
+        )
+        if (endpoint == now.endpoint) return
+        viewModelScope.launch {
+            endpointStore.save(if (now.localMode) EngineTarget.Local else EngineTarget.Remote(endpoint), endpoint)
+        }
     }
 
     /**

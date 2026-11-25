@@ -306,7 +306,7 @@ fun EngineChip(
     }
 }
 
-/** The word and the dot colour for an engine state — the chip and the tab badge agree. */
+/** The word and the dot colour for an engine state — the chip and the board's «로그» pane agree. */
 @Composable
 fun engineWord(state: ConnectionState): Pair<String, Color> = when (state) {
     ConnectionState.Ready -> tr("엔진 준비", "Ready", "引擎就绪") to ZenythTheme.colors.positive

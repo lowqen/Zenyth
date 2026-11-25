@@ -8,12 +8,11 @@ import kotlinx.coroutines.flow.Flow
  * guard logic can be unit-tested without Android's DataStore.
  */
 interface DbPreferences {
-    /** Bulk delete / split opt-in, off by default (plan §7 decision 1). */
+    /** Bulk delete / split allowed — «고급 사용자 모드» (L5-5; it was a switch of its own). */
     val destructiveUnlocked: Flow<Boolean>
 
     /** Last engine-side path used by a file operation. */
     val lastPath: Flow<String>
 
-    suspend fun setDestructiveUnlocked(on: Boolean)
     suspend fun setLastPath(path: String)
 }

@@ -49,13 +49,14 @@ import dev.gomoku.zenyth.feature.board.CommentDialog
 /**
  * The desktop's Database menu plus its `db*` console commands, on one screen.
  * Everything that acts on the board's position is here too (Zenyth Web's layout:
- * the board shows the record, the DB tab edits it); the board keeps only the
- * long press that writes a cell label.
+ * the board shows the record, the editor edits it); the board keeps only the
+ * long press that writes a cell label. Since L5-5 it is the library's
+ * `library/edit`, for everyone — the expert-only DB tab is gone.
  *
  * Everything here runs **on the server**: the database file sits next to the
  * remote engine, so file operations take engine-side paths and the phone never
  * touches the file. Destructive operations (bulk delete, split) stay locked
- * until the user opts in, and deletes confirm first — the desktop's
+ * outside «고급 사용자 모드», and deletes confirm first — the desktop's
  * `show_dbdelall_query` (settings.txt line 35).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -166,12 +167,6 @@ private fun StatusSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
             Stepper(ui.autoSaveMinutes, onChange = vm::onAutoSaveMinutes)
             Text(tr("분", "min", "分钟"), style = MaterialTheme.typography.bodyMedium)
         }
-        SwitchRow(
-            title = tr("파괴적 연산 해제", "Unlock destructive operations", "解锁破坏性操作"),
-            subtitle = tr("일괄 삭제 · 분할", "Bulk delete and split", "批量删除 · 拆分"),
-            checked = ui.db.destructiveUnlocked,
-            onChange = vm::onUnlockDestructive,
-        )
         ui.db.progress?.let { progress ->
             Text(
                 (if (progress.saving) tr("저장 중: ", "Saving:", "正在保存:") else tr("불러오는 중: ", "Loading:", "正在载入:")) + progress.file,
@@ -379,7 +374,7 @@ private fun BulkDeleteSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
         ) {
             Text(
                 if (ui.canDestroy) tr("${ui.deleteDraft.title()} 삭제", "Delete ${ui.deleteDraft.title()}", "删除 ${ui.deleteDraft.title()}")
-                else tr("잠금 상태 — 상태 절에서 해제", "Locked — unlock it in the State section", "已锁定，在状态部分解锁"),
+                else tr("고급 사용자 모드에서 — 설정", "Expert mode only — Settings", "仅限高级用户模式 — 设置"),
             )
         }
     }

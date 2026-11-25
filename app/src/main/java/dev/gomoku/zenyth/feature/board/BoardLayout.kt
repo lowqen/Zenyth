@@ -45,7 +45,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.min
+import dev.gomoku.zenyth.core.designsystem.component.ZenythSegmented
 import dev.gomoku.zenyth.core.designsystem.component.ZenythTopBar
+import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.core.designsystem.component.ShellActions
 import dev.gomoku.zenyth.core.designsystem.theme.ZenythTheme
 
@@ -104,6 +106,9 @@ internal fun BoardPortrait(
     cards: @Composable ColumnScope.() -> Unit,
     modifier: Modifier = Modifier,
     sheetUp: Boolean = false,
+    paneTabs: (@Composable () -> Unit)? = null,
+    showLog: Boolean = false,
+    logPane: @Composable (Modifier) -> Unit = {},
 ) = BoardPortrait(
     showBar = ui.showEvalBar && ui.analysisTab,
     eval = { ui.eval },
@@ -115,12 +120,21 @@ internal fun BoardPortrait(
     cards = cards,
     modifier = modifier,
     sheetUp = sheetUp,
+    paneTabs = paneTabs,
+    showLog = showLog,
+    logPane = logPane,
 )
 
 /**
  * [BoardPortrait] from what it reads itself: whether the eval bar shows, and —
  * read only where they are drawn, so an engine line does not compose the
  * sheet again — the bar's value and the timed run's wave.
+ *
+ * Under the summary line the sheet's head carries [paneTabs], the board's
+ * [개요 | 로그] (L5-5, Zenyth Web's U2): «개요» is the [cards], «로그» the
+ * [logPane] — the engine's state and console, given the sheet's whole height so
+ * the console can use it. The tabs are not counted in [MinPeek], so the board
+ * keeps its size; on most phones the peek is taller and they show at rest.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,6 +149,9 @@ internal fun BoardPortrait(
     cards: @Composable ColumnScope.() -> Unit,
     modifier: Modifier = Modifier,
     sheetUp: Boolean = false,
+    paneTabs: (@Composable () -> Unit)? = null,
+    showLog: Boolean = false,
+    logPane: @Composable (Modifier) -> Unit = {},
 ) {
     WoodTheme {
     Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
@@ -165,14 +182,20 @@ internal fun BoardPortrait(
                 sheetContent = {
                     summary()
                     SheetRule(timedRun)
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState(), flingBehavior = rememberCalmFling())
-                            .padding(ZenythTheme.tokens.screenPadding),
-                        verticalArrangement = Arrangement.spacedBy(ZenythTheme.tokens.listGap),
-                        content = cards,
-                    )
+                    paneTabs?.invoke()
+                    if (showLog) {
+                        // The sheet's full height: the console wants what is left.
+                        logPane(Modifier.fillMaxWidth().fillMaxHeight().padding(ZenythTheme.tokens.screenPadding))
+                    } else {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState(), flingBehavior = rememberCalmFling())
+                                .padding(ZenythTheme.tokens.screenPadding),
+                            verticalArrangement = Arrangement.spacedBy(ZenythTheme.tokens.listGap),
+                            content = cards,
+                        )
+                    }
                 },
             ) {
                 Column(Modifier.fillMaxWidth()) {
@@ -199,8 +222,8 @@ internal fun BoardPortrait(
 /**
  * On its side: the board on the left at full height, everything else in a
  * column on the right — the engine chip and theme switch at its top (there is
- * no header, P2), then the mode, the summary line, the cards, and the toolbar
- * at its foot.
+ * no header, P2), then the mode, the summary line, [개요 | 로그] (L5-5) over the
+ * cards or the log pane, and the toolbar at its foot.
  */
 @Composable
 internal fun BoardLandscape(
@@ -211,6 +234,9 @@ internal fun BoardLandscape(
     summary: @Composable () -> Unit,
     cards: @Composable ColumnScope.() -> Unit,
     modifier: Modifier = Modifier,
+    paneTabs: (@Composable () -> Unit)? = null,
+    showLog: Boolean = false,
+    logPane: @Composable (Modifier) -> Unit = {},
 ) = BoardLandscape(
     showBar = ui.showEvalBar && ui.analysisTab,
     eval = { ui.eval },
@@ -220,6 +246,9 @@ internal fun BoardLandscape(
     summary = summary,
     cards = cards,
     modifier = modifier,
+    paneTabs = paneTabs,
+    showLog = showLog,
+    logPane = logPane,
 )
 
 /** [BoardLandscape] from what it reads itself; see the portrait's. */
@@ -233,6 +262,9 @@ internal fun BoardLandscape(
     summary: @Composable () -> Unit,
     cards: @Composable ColumnScope.() -> Unit,
     modifier: Modifier = Modifier,
+    paneTabs: (@Composable () -> Unit)? = null,
+    showLog: Boolean = false,
+    logPane: @Composable (Modifier) -> Unit = {},
 ) {
     WoodTheme {
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
@@ -243,11 +275,16 @@ internal fun BoardLandscape(
                 ShellActions(Modifier.align(Alignment.End))
                 modeSwitch()
                 summary()
-                Column(
-                    Modifier.weight(1f).verticalScroll(rememberScrollState(), flingBehavior = rememberCalmFling()),
-                    verticalArrangement = Arrangement.spacedBy(ZenythTheme.tokens.listGap),
-                    content = cards,
-                )
+                paneTabs?.invoke()
+                if (showLog) {
+                    logPane(Modifier.weight(1f).fillMaxWidth())
+                } else {
+                    Column(
+                        Modifier.weight(1f).verticalScroll(rememberScrollState(), flingBehavior = rememberCalmFling()),
+                        verticalArrangement = Arrangement.spacedBy(ZenythTheme.tokens.listGap),
+                        content = cards,
+                    )
+                }
                 toolbar()
             }
         }
@@ -291,6 +328,22 @@ private fun SheetRule(timedRun: () -> TimedRun?) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
+}
+
+/**
+ * The board's [개요 | 로그] (L5-5, Zenyth Web's `PaneTabs`): the same place, two
+ * things to open in it — the cards, or the engine's state and console. Not tabs
+ * inside tabs: [분석] | [대국] splits what the engine is for, this what is shown.
+ */
+@Composable
+internal fun BoardPaneTabs(showLog: Boolean, onSelect: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    ZenythSegmented(
+        options = listOf(false to tr("개요", "Overview", "概览"), true to tr("로그", "Log", "日志")),
+        selection = showLog,
+        onSelect = onSelect,
+        modifier = modifier,
+        fill = true,
+    )
 }
 
 /**

@@ -5,7 +5,6 @@ import dev.gomoku.zenyth.feature.board.ResearchMiniBar
 import dev.gomoku.zenyth.feature.board.BoardViewModel
 import androidx.navigation.NavHostController
 import androidx.compose.foundation.layout.Column
-import dev.gomoku.zenyth.core.designsystem.theme.LocalProMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.tween
@@ -41,6 +40,7 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -59,10 +59,10 @@ import dev.gomoku.zenyth.data.prefs.UiPrefs
 import dev.gomoku.zenyth.domain.repository.EngineRepository
 import dev.gomoku.zenyth.domain.repository.SettingsRepository
 import dev.gomoku.zenyth.feature.board.BoardScreen
+import dev.gomoku.zenyth.feature.connection.ConnectionViewModel
 import dev.gomoku.zenyth.feature.database.DatabaseScreen
 import dev.gomoku.zenyth.feature.joseki.JosekiScreen
 import dev.gomoku.zenyth.feature.settings.SettingsScreen
-import dev.gomoku.zenyth.feature.tools.EngineScreen
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -111,12 +111,15 @@ class ShellViewModel @Inject constructor(
             val local = endpoints.localMode.first()
             val endpoint = endpoints.endpoint.first()
             // The server engine with no address typed (there is no default one):
-            // nothing to start; the connection tab asks for it.
+            // nothing to start; Settings ▸ 엔진 asks for it.
             if (!local && !endpoint.isConfigured) return@launch
             val target = if (local) EngineTarget.Local else EngineTarget.Remote(endpoint)
             runCatching { engine.connect(target) }
         }
     }
+
+    /** The board sheet on «로그» — where the old engine tab's route lands (L5-5). */
+    fun showEngineLog() = ui.boardLogPane.set(true)
 
     fun toggleTheme() {
         viewModelScope.launch { settings.set("darkMode", if (dark.value) "0" else "1") }
@@ -171,13 +174,9 @@ fun ZenythRoot() {
             restoreState = true
         }
     }
-    // The DB tab is an expert surface: shown in «고급 사용자 모드» only, and
-    // left for the board if the mode goes off while it is open.
-    val pro = LocalProMode.current
-    val destinations = Destination.entries.filter { pro || it != Destination.Database }
-    LaunchedEffect(pro, selected) {
-        if (!pro && selected == Destination.Database) onSelect(Destination.Board)
-    }
+    // The same five tabs in either mode (L5-5): expert mode guards dangerous
+    // writes now, not whole screens — the DB editor is the library's, for all.
+    val destinations = Destination.entries
 
     CompositionLocalProvider(
         LocalSnackbarHostState provides snackbarHostState,
@@ -186,13 +185,12 @@ fun ZenythRoot() {
         // One flat page behind every screen (M1: Mornye's pages are flat).
         BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
             val rail = maxWidth >= RailLayoutMin
-            // Six labelled items need ~480dp; a phone on its side has less.
-            val railLabels = maxHeight >= 480.dp
+            // Five labelled items need ~420dp; a phone on its side has less.
+            val railLabels = maxHeight >= 420.dp
             Row(Modifier.fillMaxSize()) {
                 if (rail) {
                     ZenythRail(
                         selected = selected,
-                        connection = connection,
                         onSelect = onSelect,
                         showLabels = railLabels,
                         destinations = destinations,
@@ -236,7 +234,7 @@ fun ZenythRoot() {
                                 if (selected != Destination.Board) {
                                     BoardMiniBar(navController, onOpen = { onSelect(Destination.Board) })
                                 }
-                                ZenythBottomBar(selected = selected, connection = connection, onSelect = onSelect, destinations = destinations)
+                                ZenythBottomBar(selected = selected, onSelect = onSelect, destinations = destinations)
                             }
                         }
                     },
@@ -252,12 +250,27 @@ fun ZenythRoot() {
                         popEnterTransition = { fadeIn(tween(MOTION_QUICK)) },
                         popExitTransition = { fadeOut(tween(MOTION_QUICK)) },
                     ) {
-                        composable(Destination.Board.route) { BoardScreen() }
+                        composable(Destination.Board.route) { BoardScreen(engineLog = hiltViewModel<ConnectionViewModel>()) }
                         composable(Destination.Research.route) { ResearchScreen() }
                         composable(Destination.Joseki.route) { JosekiScreen() }
-                        composable(Destination.Database.route) { DatabaseScreen() }
+                        // The library tab's own graph, so a page under it keeps the
+                        // tab lit and its stack survives a trip to another tab.
+                        // Until the library's first page (L5-6) it opens on the editor.
+                        navigation(route = Destination.Library.route, startDestination = Routes.LIBRARY_EDIT) {
+                            composable(Routes.LIBRARY_EDIT) { DatabaseScreen() }
+                        }
                         composable(Destination.Settings.route) { SettingsScreen() }
-                        composable(Destination.Connect.route) { EngineScreen() }
+                        // The two tabs L5-5 took away, kept as routes so a back stack
+                        // saved by the older app (or a link) still lands somewhere.
+                        composable(Routes.LEGACY_DATABASE) {
+                            LaunchedEffect(Unit) { onSelect(Destination.Library) }
+                        }
+                        composable(Routes.LEGACY_CONNECT) {
+                            LaunchedEffect(Unit) {
+                                shell.showEngineLog()
+                                onSelect(Destination.Board)
+                            }
+                        }
                     }
                 }
             }

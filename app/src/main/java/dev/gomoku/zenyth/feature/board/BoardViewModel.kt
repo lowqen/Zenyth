@@ -720,7 +720,7 @@ class BoardViewModel @Inject constructor(
 
     // ---- database actions (P7) ---------------------------------------------
 
-    /** Long press on an empty point: the cell label. Everything else of the database is in the DB tab. */
+    /** Long press on an empty point: the cell label. Everything else of the database is in the library's editor. */
     fun onCellLabel(cell: Move, label: String) = runDb { database.editCellLabel(cell, label) }
 
     fun onNoticeShown() {

@@ -106,9 +106,6 @@ interface DatabaseRepository {
     /** Mirrors line 33 and pushes `info database_readonly`. */
     suspend fun setReadOnly(on: Boolean)
 
-    /** Opt in to bulk deletes / split (app-local preference, off by default). */
-    suspend fun setDestructiveUnlocked(on: Boolean)
-
     fun clearLog()
 }
 

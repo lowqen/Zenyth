@@ -50,16 +50,7 @@ val UiPrefs.themeWallpaperTone: UiPrefs.BoolPref get() = bool("theme.wallpaperTo
  */
 val UiPrefs.hapticsEnabled: UiPrefs.BoolPref get() = bool("haptics.enabled", true)
 
-/**
- * «고급 사용자 모드» — off by default (user request, 2026-10-29). Off, the app
- * shows what playing and studying need; on, it adds the expert surfaces: the DB
- * tab, the engine console and its command line, the engine screen's Tools, the
- * board's Tools card and the PC settings list. Nothing is removed — only folded
- * away until asked for. Read by the activity into [LocalProMode].
- */
-val UiPrefs.proMode: UiPrefs.BoolPref get() = bool("pro.enabled", false)
-
-/** See [proMode]. True outside the activity (previews, tests): show everything. */
+/** See [UiPrefs.proMode]. True outside the activity (previews, tests): show everything. */
 val LocalProMode = androidx.compose.runtime.staticCompositionLocalOf { true }
 
 /** Whether this phone has wallpaper colours to offer at all. */
