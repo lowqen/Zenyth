@@ -22,6 +22,7 @@ import dev.gomoku.zenyth.core.designsystem.theme.ZenythTheme
 import dev.gomoku.zenyth.core.model.Move
 import dev.gomoku.zenyth.domain.library.CoverKey
 import dev.gomoku.zenyth.domain.library.LibraryCover
+import dev.gomoku.zenyth.domain.library.StartMode
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -89,7 +90,7 @@ class LibraryScreenshotTest(private val variant: Variant) {
             LibraryDetail(
                 detailUi.copy(
                     coverKey = CoverKey.E0, cover = LibraryCover(LibraryCover.AUTO, seed = 6), scanLine = ScanLine.COUNTING,
-                    scanFraction = 0.37f, openings = emptyList(), roots = emptyList(), records = null, chips = listOf("1.2MB"),
+                    scanFraction = 0.37f, openings = emptyList(), roots = emptyList(), start = null, records = null, chips = listOf("1.2MB"),
                 ),
                 LibraryDetailActions(),
                 onBack = {},
@@ -170,6 +171,7 @@ class LibraryScreenshotTest(private val variant: Variant) {
             RootRow("k2", listOf(Move(7, 7)), 2400),
             RootRow("k3", null, 40),
         ),
+        start = StartUi(listOf(Move(7, 7), Move(8, 6), Move(9, 7), Move(6, 8), Move(10, 6)), StartMode.BRANCH, branched = true),
         records = RecordsUi(w = 310, l = 280, d = 12, comments = 54, rules = null),
         targets = listOf(SourceChip("saf1", "폴더: 기보", folder = true, lost = false)),
     )
