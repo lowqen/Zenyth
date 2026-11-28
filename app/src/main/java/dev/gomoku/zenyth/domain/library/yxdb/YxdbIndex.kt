@@ -121,7 +121,7 @@ object YxdbIndex {
     /** Parents' openings disagree — inside the index only; out (counts · [ClassifiedFn]) it folds to 26. */
     private const val MIXED = 27
     private fun outward(o: Int) = if (o == MIXED) UNCLASSIFIED else o
-    private const val ROOT_KEY_CAP = 8 shl 20
+    private const val ROOT_KEY_CAP = 8L shl 20
 
     internal fun log2Ceil(v: Double): Int = kotlin.math.ceil(kotlin.math.log2(v)).toInt()
 
