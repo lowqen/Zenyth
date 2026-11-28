@@ -211,7 +211,9 @@ class LibraryViewModel @Inject constructor(
                     is OpenOutcome.Refused -> notify(r.message)
                     is OpenOutcome.Opened -> {
                         r.moves?.let { moves ->
-                            val what = if (r.start) {
+                            val what = if (r.start && moves.isEmpty()) {
+                                tr("라이브러리에서 «${r.title}» — 빈 판에서 시작", "From the library: «${r.title}», from an empty board", "从资料库: «${r.title}»，从空棋盘开始")
+                            } else if (r.start) {
                                 tr("라이브러리에서 «${r.title}»의 시작 국면(${moves.size}수)으로", "From the library: «${r.title}», its start (${moves.size} moves)", "从资料库: «${r.title}» 的起始局面 (${moves.size} 手)")
                             } else {
                                 tr("라이브러리에서 ${moves.size}수 국면으로", "From the library: a ${moves.size}-move position", "从资料库: ${moves.size} 手局面")

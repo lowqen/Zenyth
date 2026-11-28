@@ -410,6 +410,11 @@ class LibraryAttachController(
      */
     suspend fun onBackground() {
         if (!engine.state.value.isLive) return
+        // Measured now, not waited for: the engine appends a search's records to
+        // the journal with no save end to say so, and the save the idle watcher
+        // sends on this same ON_STOP ends only after this check (seen on the
+        // phone, L5-6) — the flag alone said «clean» and nothing went home.
+        store.attached()?.let { a -> withContext(Dispatchers.IO) { noteSavedNow(a) } }
         if (store.marks().none { it.dirty }) return
         keepAlive.acquire(EngineKeepAlive.DB_WRITEBACK)
         try {

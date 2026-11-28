@@ -282,7 +282,12 @@ fun ZenythRoot() {
                                 LibraryDetailScreen(
                                     viewModel = vm,
                                     id = id,
-                                    onBack = { navController.popBackStack() },
+                                    // Idempotent: a trash sends «back» and the page also
+                                    // sees its entry gone — two pops took the whole tab
+                                    // away to the board (phone, L5-6).
+                                    onBack = {
+                                        if (navController.currentBackStackEntry?.id == entry.id) navController.popBackStack()
+                                    },
                                     onBoard = { onSelect(Destination.Board) },
                                     onEditor = { navController.navigate(Routes.LIBRARY_EDIT) },
                                 )
