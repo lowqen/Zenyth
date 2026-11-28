@@ -41,8 +41,12 @@ class ThermalMonitor @Inject constructor(
     init {
         if (power != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                power.addThermalStatusListener(ContextCompat.getMainExecutor(context)) { status ->
-                    _state.update { it.copy(status = status) }
+                // Throws «Listener failed to set» when the thermal service is not
+                // there (Robolectric, some ROMs) — such a phone is simply never capped.
+                runCatching {
+                    power.addThermalStatusListener(ContextCompat.getMainExecutor(context)) { status ->
+                        _state.update { it.copy(status = status) }
+                    }
                 }
             }
             ContextCompat.registerReceiver(
