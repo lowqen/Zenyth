@@ -12,6 +12,7 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import dev.gomoku.zenyth.R
 import dev.gomoku.zenyth.core.model.ConnectionState
+import dev.gomoku.zenyth.core.model.EngineIdlePolicy
 import dev.gomoku.zenyth.core.model.LinkHealth
 import dev.gomoku.zenyth.domain.repository.EngineRepository
 import dagger.hilt.android.AndroidEntryPoint
@@ -61,7 +62,7 @@ class EngineService : LifecycleService() {
             ) { (st, wanted), health, heat, holds ->
                 Snapshot(st, wanted, health, heat, holds.isNotEmpty())
             }.collectLatest { (st, wanted, health, heat, held) ->
-                if (!wanted && st !is ConnectionState.Thinking && !health.reconnecting && !held) {
+                if (EngineIdlePolicy.serviceMayStop(wanted, st, health, held)) {
                     stopSelf()
                 } else {
                     startAsForeground(st, health, heat, held)

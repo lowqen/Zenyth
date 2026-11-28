@@ -61,4 +61,16 @@ class EngineIdlePolicyTest {
         assertThat(EngineIdlePolicy.BACKGROUND_STOP_CHOICES).contains(0)
         assertThat(EngineIdlePolicy.BACKGROUND_STOP_CHOICES).contains(EngineIdlePolicy.BACKGROUND_STOP_DEFAULT_MIN)
     }
+
+    @Test
+    fun `the service outlives the Disconnected moment at the start of a connect`() {
+        // L5-6: connect() says it wants a session before the link says Connecting.
+        assertThat(EngineIdlePolicy.serviceMayStop(wanted = true, ConnectionState.Disconnected, calm, held = false)).isFalse()
+        assertThat(EngineIdlePolicy.serviceMayStop(wanted = true, ConnectionState.Ready, calm, held = false)).isFalse()
+        // Hung up: it goes — unless a search is still settling, a reconnect waits, or a write-back holds it.
+        assertThat(EngineIdlePolicy.serviceMayStop(wanted = false, ConnectionState.Disconnected, calm, held = false)).isTrue()
+        assertThat(EngineIdlePolicy.serviceMayStop(wanted = false, ConnectionState.Thinking, calm, held = false)).isFalse()
+        assertThat(EngineIdlePolicy.serviceMayStop(wanted = false, ConnectionState.Disconnected, retrying, held = false)).isFalse()
+        assertThat(EngineIdlePolicy.serviceMayStop(wanted = false, ConnectionState.Disconnected, calm, held = true)).isFalse()
+    }
 }

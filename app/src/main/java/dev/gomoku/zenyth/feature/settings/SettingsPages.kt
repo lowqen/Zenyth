@@ -351,7 +351,7 @@ private fun SectionsBuilder.engineSections(ui: SettingsUiState, actions: Setting
                     val stopMin by prefs.backgroundAnalysisStopMin.state.collectAsStateWithLifecycle()
                     FieldRow(
                         tr("앱을 떠난 뒤 분석 정지", "Stop analysis after leaving the app", "离开应用后停止分析"),
-                        note = tr("다른 앱을 쓰는 동안 분석이 밤새 돌지 않게", "So an analysis does not run all night in the background", "避免分析在后台通宵运行"),
+                        note = tr("밤새 돌지 않게", "So it never runs all night", "避免通宵运行"),
                     ) {
                         ChoiceChips(
                             options = EngineIdlePolicy.BACKGROUND_STOP_CHOICES.map { m ->

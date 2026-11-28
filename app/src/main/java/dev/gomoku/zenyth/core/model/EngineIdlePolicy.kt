@@ -12,8 +12,9 @@ package dev.gomoku.zenyth.core.model
  * short: [PARK_AFTER_MS] covers a quick look at another app without paying for
  * the ones that never come back.
  *
- * A search is never cut short: an analysis left running in the background is what
- * the foreground service is for.
+ * Parking never cuts a search short: an analysis left running in the background is
+ * what the foreground service is for. Only the user's own limit stops one
+ * ([backgroundStopAfterMs], default 30 minutes — L5-6 decision).
  */
 object EngineIdlePolicy {
 
@@ -32,6 +33,16 @@ object EngineIdlePolicy {
      */
     fun backgroundStopAfterMs(foreground: Boolean, analysing: Boolean, limitMin: Int): Long? =
         if (foreground || !analysing || limitMin <= 0) null else limitMin * 60_000L
+
+    /**
+     * Whether the engine's foreground service may go: nobody wants a session, no
+     * search is still settling, no reconnect is waiting, nothing holds it up (a
+     * library write-back). Not the link's state alone — every connect passes
+     * through `Disconnected` first, and a service that stopped there left the
+     * engine running in a cached app (L5-6: killed for 353 s of CPU in 5 min).
+     */
+    fun serviceMayStop(wanted: Boolean, state: ConnectionState, health: LinkHealth, held: Boolean): Boolean =
+        !wanted && state != ConnectionState.Thinking && !health.reconnecting && !held
 
     /**
      * Whether the session is idle and out of sight: the app is in the background and
