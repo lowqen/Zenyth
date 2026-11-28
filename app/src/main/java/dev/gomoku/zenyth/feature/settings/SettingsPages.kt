@@ -45,6 +45,7 @@ import dev.gomoku.zenyth.core.model.EngineIdlePolicy
 import dev.gomoku.zenyth.core.model.SettingCategory
 import dev.gomoku.zenyth.core.model.SettingsFile
 import dev.gomoku.zenyth.data.prefs.UiPrefs
+import dev.gomoku.zenyth.domain.library.StartMode
 
 /**
  * The settings as Mornye lays its own out (UI overhaul 2, M3): one list of
@@ -392,6 +393,27 @@ private fun SectionsBuilder.dataSections(actions: SettingsActions, prefs: UiPref
         }
     }
     if (prefs == null) return
+    section("library") {
+        val openAt by prefs.libraryOpenAt.state.collectAsStateWithLifecycle()
+        ConnectedGroup(title = tr("라이브러리", "Library", "资料库")) {
+            row {
+                FieldRow(
+                    tr("DB 열 때 시작 국면", "Where a DB opens", "打开数据库时的起始局面"),
+                    note = tr("«이 DB 열기»가 판에 놓는 곳", "What «Open this DB» puts on the board", "«打开此数据库» 放到棋盘上的局面"),
+                ) {
+                    ChoiceChips(
+                        options = listOf(
+                            StartMode.BRANCH.key to tr("갈라지는 곳", "Where it branches", "分叉处"),
+                            StartMode.ROOT.key to tr("가장 큰 뿌리", "Largest root", "最大的根"),
+                            StartMode.EMPTY.key to tr("빈 판", "Empty board", "空棋盘"),
+                        ),
+                        selected = StartMode.of(openAt).key,
+                        onSelect = { prefs.libraryOpenAt.set(it) },
+                    )
+                }
+            }
+        }
+    }
     section("curriculum") {
         val curriculum by prefs.curriculumAutoUpdate.state.collectAsStateWithLifecycle()
         ConnectedGroup(title = tr("정석", "Joseki", "定式")) {

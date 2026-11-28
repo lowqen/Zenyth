@@ -86,4 +86,28 @@ class CoverKeyTest {
         assertThat(out).hasSize(5)
         assertThat(hex(15, out)).isEqualTo(roots[0].start)
     }
+
+    @Test
+    fun `the start mode picks the branch, the root, or an empty board`() {
+        val deep = listOf(Move(7, 7), Move(7, 6), Move(7, 5))
+        val roots = listOf(DbRoot(hex(15, emptyList()), 900, start = hex(15, deep)))
+        val s = stats(roots = roots)
+        assertThat(LibraryPositions.startMovesOf(s, 15, StartMode.BRANCH)).hasSize(3)
+        assertThat(LibraryPositions.startMovesOf(s, 15, StartMode.ROOT)).isEmpty()
+        assertThat(LibraryPositions.startMovesOf(s, 15, StartMode.EMPTY)).isEmpty()
+        assertThat(LibraryPositions.startMovesOf(null, 15, StartMode.EMPTY)).isEmpty() // no stats needed
+        assertThat(LibraryPositions.startMovesOf(null, 15, StartMode.BRANCH)).isNull()
+        assertThat(StartMode.of("root")).isEqualTo(StartMode.ROOT)
+        assertThat(StartMode.of("??")).isEqualTo(StartMode.BRANCH)
+    }
+
+    @Test
+    fun `the main rule is the one with the most positions`() {
+        val s = stats().copy(rules = mapOf("freestyle-15" to 3L, "renju-15" to 9L, "standard-20" to 1L))
+        assertThat(LibraryPositions.mainRuleOf(s)).isEqualTo(DbRule(2, 15))
+        assertThat(LibraryPositions.mainRuleOf(s.copy(rules = mapOf("standard-20" to 1L)))).isEqualTo(DbRule(1, 20))
+        assertThat(LibraryPositions.mainRuleOf(s.copy(rules = mapOf("rule7-15" to 1L)))).isNull()
+        assertThat(LibraryPositions.mainRuleOf(s.copy(rules = mapOf("renju-15x20" to 1L)))).isNull()
+        assertThat(LibraryPositions.mainRuleOf(null)).isNull()
+    }
 }

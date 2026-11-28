@@ -219,6 +219,23 @@ fun DrawScope.drawBoard(
             )
         }
     }
+    // database records without a value — the trail the engine leaves on every
+    // lookup, which leads into the real records. Yixin paints a plain DB cell
+    // there (main.c:1987); here a small hollow ring, about a quarter of a point
+    // across, in the colour of the side to move, over a rim for either wood.
+    if (render.dbWaypoints.isNotEmpty()) {
+        val black = render.stones.size % 2 == 0
+        val face = if (black) skin.blackLow else skin.whiteHigh
+        val rim = if (black) skin.whiteHigh else skin.blackRim
+        val r = step * 0.13f
+        val w = step * 0.055f
+        render.dbWaypoints.forEach { m ->
+            if (m in occupiedCells || m in render.tags || m in render.dbLabels || m in render.marks) return@forEach
+            val c = Offset(cx(m.x), cy(m.y))
+            drawCircle(rim, radius = r, center = c, alpha = 0.55f, style = Stroke(width = w + hair * 1.6f))
+            drawCircle(face, radius = r, center = c, style = Stroke(width = w))
+        }
+    }
     render.marks.forEach { (m, mark) ->
         if (m !in occupiedCells && m !in render.tags && m !in render.dbLabels) {
             drawValueText(cx(m.x), cy(m.y), geometry, mark.text, mark.color, textScale * 0.9f, paints, bold = true)

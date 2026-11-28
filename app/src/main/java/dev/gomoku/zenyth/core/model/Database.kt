@@ -27,6 +27,12 @@ data class DbCell(
     val text: String = "",
     /** Raw trailing fields of the message (value, depth, bound, …), kept verbatim. */
     val fields: List<Int> = emptyList(),
+    /**
+     * A record with no label (`DATABASE x y -1`, Rapfi's `LABEL_NONE`) — the
+     * engine leaves these on every lookup, so they lead into the real records.
+     * Yixin draws a plain DB cell there; the board draws a small ring (L5-6 P3).
+     */
+    val waypoint: Boolean = false,
 ) {
     /** What the board shows: the free text when present, else the tag. */
     fun display(showBoardText: Boolean): String =

@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.gomoku.zenyth.core.designsystem.component.LocalUiPrefs
 import dev.gomoku.zenyth.core.designsystem.component.ZenythCollapsingTopBar
 import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.core.designsystem.component.CalmCard
@@ -156,6 +157,15 @@ private fun StatusSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
             checked = ui.showBoardText,
             onChange = vm::onShowBoardText,
         )
+        LocalUiPrefs.current?.let { prefs ->
+            val waypoints by prefs.dbWaypoints.state.collectAsStateWithLifecycle()
+            SwitchRow(
+                title = tr("DB 길목 표시", "Show DB waypoints", "显示数据库路径"),
+                subtitle = tr("값 없는 기록을 판에 작은 고리로", "Records without a value as small rings", "无估值的记录显示为小圆环"),
+                checked = waypoints,
+                onChange = { prefs.dbWaypoints.set(it) },
+            )
+        }
         SwitchRow(
             title = tr("주기 자동 저장", "Periodic auto-save", "定期自动保存"),
             subtitle = tr("엔진이 쉴 때만", "Only while the engine is idle", "仅在引擎空闲时"),

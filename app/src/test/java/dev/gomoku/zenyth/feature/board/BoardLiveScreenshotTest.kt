@@ -246,6 +246,7 @@ class BoardLiveScreenshotTest(private val variant: Variant) {
             Move(2, 6) to DbLabel("=", DbCellKind.DRAW),
             Move(3, 9) to DbLabel("note", DbCellKind.NOTE),
         ),
+        dbWaypoints = setOf(Move(1, 13), Move(13, 11), Move(8, 2)),
         badges = mapOf(Move(10, 6) to MoveQuality.BRILLIANT, Move(7, 9) to MoveQuality.BLUNDER),
         blocked = setOf(Move(0, 14), Move(14, 0)),
         marks = mapOf(Move(1, 8) to BoardMark("A", BoardMarkColors.Good), Move(13, 8) to BoardMark("B", BoardMarkColors.Bad)),

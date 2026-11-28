@@ -238,6 +238,20 @@ class DatabaseProtocolTest {
     // ---- aggregation --------------------------------------------------------
 
     @Test
+    fun `a record without a label stays as a waypoint and carries no value`() {
+        val agg = DatabaseAggregator()
+        agg.consume(ResponseParser.parse("MESSAGE DATABASE REFRESH", coord))
+        agg.consume(ResponseParser.parse("MESSAGE DATABASE 7 7 -1 0 0 0", coord))
+        agg.consume(ResponseParser.parse("MESSAGE DATABASE 6 8 0 0 0 0", coord))
+        val snapshot = agg.consume(ResponseParser.parse("MESSAGE DATABASE DONE", coord))!!
+        assertEquals(1, snapshot.cells.size) // tag 0 is no record at all
+        val cell = snapshot.cells.values.single()
+        assertTrue(cell.waypoint)
+        assertEquals("", cell.display(showBoardText = true))
+        assertEquals(null, snapshot.positionValue(blackToMove = true, playablePoints = 1))
+    }
+
+    @Test
     fun `aggregator collects cells, clears on refresh and closes on done`() {
         val agg = DatabaseAggregator()
         agg.consume(ResponseParser.parse("MESSAGE DATABASE REFRESH", coord))

@@ -243,11 +243,13 @@ internal class BoardUiMapper(private val liveRecords: () -> List<PositionRecord>
         val ghosts = pv.filterNot { pos.moves.contains(it) }.take(GHOST_LIMIT)
         val bestMark = shown?.realtimeBest ?: shown?.best?.head
         val overlay = config.showAnalysis && shown != null
-        val dbLabels = if (analysisTab && review == null && config.useDatabase && !panel.game.thinking) {
+        val dbShown = analysisTab && review == null && config.useDatabase && !panel.game.thinking
+        val dbLabels = if (dbShown) {
             dbLabelsOf(DbLabelsKey(panel.db.snapshot.cells, config.showBoardText))
         } else {
             emptyMap()
         }
+        val dbWaypoints = if (dbShown && panel.dbWaypoints) waypointsOf(panel.db.snapshot.cells) else emptySet()
         val tags = if (overlay && config.showAnalysisWinrate && panel.preview == null) {
             shown.tags.filterKeys { it !in dbLabels }
         } else {
@@ -264,6 +266,7 @@ internal class BoardUiMapper(private val liveRecords: () -> List<PositionRecord>
             candidates = if (overlay && panel.analyzing) shown.candidates else emptyMap(),
             loseCells = if (overlay && panel.analyzing) shown.loseCells else emptySet(),
             dbLabels = dbLabels,
+            dbWaypoints = dbWaypoints - dbLabels.keys,
             badges = if (config.showMoveBadge && quality != null && quality != MoveQuality.NONE && pos.moves.isNotEmpty()) {
                 mapOf(pos.moves.last() to quality)
             } else {
@@ -359,6 +362,10 @@ internal class BoardUiMapper(private val liveRecords: () -> List<PositionRecord>
             val text = cell.display(k.showBoardText)
             if (text.isEmpty()) null else move to DbLabel(text, cell.kindOf())
         }.toMap()
+    }
+
+    private val waypointsOf = Memo<Map<Move, DbCell>, Set<Move>> { cells ->
+        cells.filterValues { it.waypoint }.keys
     }
 
     private val fromSettings = Memo<AppSettings, SettingsParts> { config ->

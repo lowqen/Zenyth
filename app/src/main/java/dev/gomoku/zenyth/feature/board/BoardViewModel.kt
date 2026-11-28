@@ -122,6 +122,7 @@ class BoardViewModel @Inject constructor(
 
     private val analysisSecPref = uiPrefs.int("analysis.sec", 0)
     private val playBestPref = uiPrefs.bool("analysis.playBestOnStop", true)
+    private val dbWaypointsPref = uiPrefs.dbWaypoints
 
     /** The board a link (or the library) replaced, kept until the user keeps or drops it. */
     private val linkBackup = MutableStateFlow<LinkBackup?>(null)
@@ -162,6 +163,8 @@ class BoardViewModel @Inject constructor(
         val playBest: Boolean,
         val linkBackup: Boolean,
         val linkBackupTitle: String?,
+        /** «DB 길목 표시» (L5-6 P3). */
+        val dbWaypoints: Boolean = true,
     )
 
     private val panel = combine(
@@ -170,6 +173,7 @@ class BoardViewModel @Inject constructor(
             game.future, balancing, game.state, review.report, prove.overlay, prove.progress,
             tools.state, review.progress, appearance.toolbar, appearance.language, defending,
             game.mode, game.gameName, analysisSecPref.state, playBestPref.state, linkBackup,
+            dbWaypointsPref.state,
         ),
     ) { values ->
         @Suppress("UNCHECKED_CAST")
@@ -197,6 +201,7 @@ class BoardViewModel @Inject constructor(
             playBest = values[20] as Boolean,
             linkBackup = values[21] != null,
             linkBackupTitle = (values[21] as LinkBackup?)?.title,
+            dbWaypoints = values[22] as Boolean,
         )
     }
 

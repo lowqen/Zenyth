@@ -16,12 +16,16 @@ import dev.gomoku.zenyth.data.library.job.LibraryJobClient
 import dev.gomoku.zenyth.data.prefs.UiPrefs
 import dev.gomoku.zenyth.domain.library.LibraryCover
 import dev.gomoku.zenyth.domain.library.LibraryFileNames
+import dev.gomoku.zenyth.domain.library.LibraryPositions
+import dev.gomoku.zenyth.domain.library.StartMode
+import dev.gomoku.zenyth.domain.repository.SettingsRepository
 import dev.gomoku.zenyth.domain.repository.GameRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -51,8 +55,12 @@ class LibraryViewModel @Inject constructor(
     private val jobs: LibraryJobClient,
     private val game: GameRepository,
     private val links: IncomingLinks,
+    private val settings: SettingsRepository,
     prefs: UiPrefs,
 ) : ViewModel() {
+
+    /** «DB 열 때 시작 국면» (L5-6 P3). */
+    private val openAtPref = prefs.libraryOpenAt
 
     private val sourcePref = prefs.string("library.source", "app")
     private val sortPref = prefs.string("library.sort", LibrarySort.RECENT.name)
@@ -79,11 +87,57 @@ class LibraryViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
     /** The page of entry [id] (null when it went away). */
-    fun detail(id: String): Flow<LibraryDetailUi?> = repo.state.map { s ->
-        val item = s.items.firstOrNull { it.id == id } ?: return@map null
+    fun detail(id: String): Flow<LibraryDetailUi?> = combine(repo.state, openAtPref.state) { s, openAt ->
+        val item = s.items.firstOrNull { it.id == id } ?: return@combine null
         val others = s.items.filter { it.sourceId == item.sourceId && it.id != id }.map { it.entry.file }
-        LibraryUiMapper.detail(item, s, game.position.value.size, others)
+        LibraryUiMapper.detail(item, s, game.position.value.size, others, StartMode.of(openAt))
     }.distinctUntilChanged()
+
+    private val _ruleClash = MutableStateFlow<RuleClash?>(null)
+
+    /** «열기» stopped by a DB of another rule — the dialog's question (L5-6 P3). */
+    val ruleClash: StateFlow<RuleClash?> = _ruleClash.asStateFlow()
+
+    /**
+     * «열기» with the rule check first: a DB whose positions are mostly under
+     * another rule or board size than the board's opens after a question —
+     * the engine would otherwise look its positions up under the wrong rule
+     * and find nothing. The editor ([OpenAt.Keep]) does not ask.
+     */
+    fun requestOpen(id: String, at: OpenAt) {
+        if (at != OpenAt.Keep) {
+            val db = LibraryPositions.mainRuleOf(repo.item(id)?.entry?.stats)
+            val rule = settings.settings.value.engineRule
+            val size = game.position.value.size
+            if (db != null && (db.rule != rule || db.size != size)) {
+                _ruleClash.value = RuleClash(id, at, db, rule, size)
+                return
+            }
+        }
+        open(id, at)
+    }
+
+    fun dismissRuleClash() {
+        _ruleClash.value = null
+    }
+
+    /** [그대로 열기]. */
+    fun openDespiteRule() {
+        val c = _ruleClash.value ?: return
+        _ruleClash.value = null
+        open(c.id, c.at)
+    }
+
+    /** [규칙 바꿔 열기] — the board takes the DB's rule (same size only), then opens. */
+    fun openWithDbRule() {
+        val c = _ruleClash.value ?: return
+        _ruleClash.value = null
+        if (!c.canSwitch) return open(c.id, c.at)
+        viewModelScope.launch {
+            runCatching { settings.set("rule", c.db.rule.toString()) }
+            open(c.id, c.at)
+        }
+    }
 
     private val _events = Channel<LibraryEvent>(Channel.BUFFERED)
     val events: Flow<LibraryEvent> = _events.receiveAsFlow()
@@ -207,7 +261,7 @@ class LibraryViewModel @Inject constructor(
         _busy.value = true
         viewModelScope.launch {
             try {
-                when (val r = repo.open(id, at, game.position.value.size)) {
+                when (val r = repo.open(id, at, game.position.value.size, StartMode.of(openAtPref.value))) {
                     is OpenOutcome.Refused -> notify(r.message)
                     is OpenOutcome.Opened -> {
                         r.moves?.let { moves ->

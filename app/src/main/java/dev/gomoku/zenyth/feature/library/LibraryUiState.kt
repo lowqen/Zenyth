@@ -7,13 +7,16 @@ import dev.gomoku.zenyth.data.library.AppDirSource
 import dev.gomoku.zenyth.data.library.LibraryItem
 import dev.gomoku.zenyth.data.library.LibrarySourceView
 import dev.gomoku.zenyth.data.library.LibraryState
+import dev.gomoku.zenyth.data.library.OpenAt
 import dev.gomoku.zenyth.data.library.ScanNote
 import dev.gomoku.zenyth.data.library.SourceAccess
 import dev.gomoku.zenyth.data.library.SourceKind
 import dev.gomoku.zenyth.domain.library.CoverKey
 import dev.gomoku.zenyth.domain.library.Covers
 import dev.gomoku.zenyth.domain.library.LibraryCover
+import dev.gomoku.zenyth.domain.library.DbRule
 import dev.gomoku.zenyth.domain.library.LibraryPositions
+import dev.gomoku.zenyth.domain.library.StartMode
 
 enum class LibrarySort { RECENT, NAME, SIZE }
 
@@ -66,6 +69,18 @@ data class OpeningRow(val index: Int, val count: Long) {
     val name: String get() = Opening26.name(index)
 }
 
+/**
+ * Where «이 DB 열기» goes (L5-6 P3): [moves] by [mode]; [branched] = the records'
+ * start lies below the largest root (the engine's lookup trail skipped).
+ */
+data class StartUi(val moves: List<Move>, val mode: StartMode, val branched: Boolean)
+
+/** «이 DB 열기» against a board of another rule (L5-6 P3): what the dialog says and offers. */
+data class RuleClash(val id: String, val at: OpenAt, val db: DbRule, val boardRule: Int, val boardSize: Int) {
+    /** The board can take the DB's rule without changing size. */
+    val canSwitch: Boolean get() = db.size == boardSize
+}
+
 /** A root position: [moves] null when it does not read on this board (another size, a pass). */
 data class RootRow(val key: String, val moves: List<Move>?, val subtree: Long)
 
@@ -93,6 +108,8 @@ data class LibraryDetailUi(
     /** Unclassified outweighs classified: the roots lead and the distribution folds. */
     val rootsFirst: Boolean = true,
     val roots: List<RootRow> = emptyList(),
+    /** What «이 DB 열기» puts on the board; null without stats (it then keeps the board). */
+    val start: StartUi? = null,
     val records: RecordsUi? = null,
     /** Where a copy · move can go — the other reachable sources. */
     val targets: List<SourceChip> = emptyList(),
@@ -161,7 +178,13 @@ object LibraryUiMapper {
         )
     }
 
-    fun detail(item: LibraryItem, s: LibraryState, boardSize: Int, otherFiles: List<String> = emptyList()): LibraryDetailUi {
+    fun detail(
+        item: LibraryItem,
+        s: LibraryState,
+        boardSize: Int,
+        otherFiles: List<String> = emptyList(),
+        mode: StartMode = StartMode.BRANCH,
+    ): LibraryDetailUi {
         val e = item.entry
         val stats = e.stats
         val scan = s.scan?.takeIf { it.entryId == item.id }
@@ -212,6 +235,10 @@ object LibraryUiMapper {
             unclassified = unclassified,
             rootsFirst = openings == null || unclassified > classified,
             roots = stats?.roots.orEmpty().map { RootRow(it.key, LibraryPositions.movesOfKey(it.key, boardSize), it.subtree) },
+            start = LibraryPositions.startMovesOf(stats, boardSize, mode)?.let { moves ->
+                val root = LibraryPositions.startMovesOf(stats, boardSize, StartMode.ROOT)
+                StartUi(moves, mode, branched = mode == StartMode.BRANCH && root != null && moves.size > root.size)
+            },
             records = stats?.let {
                 RecordsUi(
                     w = it.labels.W, l = it.labels.L, d = it.labels.D, comments = it.commented,

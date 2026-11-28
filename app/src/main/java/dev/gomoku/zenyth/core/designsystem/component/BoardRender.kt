@@ -28,6 +28,8 @@ data class BoardRender(
     val candidates: Map<Move, CandidateState> = emptyMap(), // realtime POS/DONE
     val loseCells: Set<Move> = emptySet(),        // realtime LOSE
     val dbLabels: Map<Move, DbLabel> = emptyMap(), // yixindb values / board texts
+    /** yixindb records without a value (the engine's lookup trail) — small rings in the side to move's colour. */
+    val dbWaypoints: Set<Move> = emptySet(),
     val showNumbers: Boolean = true,              // settings.txt line 14
     val palette: TagPalette = TagPalette(),       // saturation/value settings
     /** Review grades on played stones (settings_dev line 4, `mq_badge_pixbuf`). */

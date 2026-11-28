@@ -61,6 +61,7 @@ import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.core.model.Move
 import dev.gomoku.zenyth.domain.library.CoverKey
 import dev.gomoku.zenyth.domain.library.LibraryPositions
+import dev.gomoku.zenyth.domain.library.StartMode
 
 /** What the detail page can ask for. */
 class LibraryDetailActions(
@@ -109,6 +110,7 @@ fun LibraryDetail(
             ) {
                 if (onBack != null) RoundBackButton(onBack, Modifier.padding(bottom = 4.dp))
                 DetailHead(ui, actions, busy)
+                StartCard(ui, actions, busy)
                 ScanLineCard(ui, actions)
                 if (ui.rootsFirst) {
                     RootsSection(ui, actions, busy)
@@ -182,6 +184,49 @@ private fun DetailHead(ui: LibraryDetailUi, actions: LibraryDetailActions, busy:
                 cover()
                 text(Modifier.fillMaxWidth())
             }
+        }
+    }
+}
+
+/**
+ * «기록 시작점» (L5-6 P3): the position «이 DB 열기» goes to, as a small board —
+ * by default where the records branch, past the empty lookup records the
+ * engine leaves on its way in.
+ */
+@Composable
+private fun StartCard(ui: LibraryDetailUi, actions: LibraryDetailActions, busy: Boolean) {
+    val s = ui.start ?: return
+    CalmCard {
+        CardTitle(tr("기록 시작점", "Where the records start", "记录起点"))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(enabled = !busy, role = Role.Button, onClick = actions.onOpenStart)
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            MiniBoard(s.moves, Modifier.size(72.dp), showNumbers = false)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    if (s.moves.isEmpty()) tr("빈 판에서 엽니다", "Opens on an empty board", "从空棋盘打开")
+                    else tr("${s.moves.size}수 국면에서 엽니다", "Opens at a ${s.moves.size}-move position", "从 ${s.moves.size} 手局面打开"),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    when (s.mode) {
+                        StartMode.BRANCH ->
+                            if (s.branched) tr("기록이 갈라지는 곳 — 그 앞은 엔진이 지나며 남긴 빈 기록입니다", "Where the records branch — before it, only the empty records the engine left on its way", "记录分叉处——之前只是引擎经过时留下的空记录")
+                            else tr("기록이 갈라지는 곳", "Where the records branch", "记录分叉处")
+                        StartMode.ROOT -> tr("가장 큰 뿌리 국면", "The largest root position", "最大的根局面")
+                        StartMode.EMPTY -> tr("늘 빈 판에서 (설정 ▸ 데이터)", "Always an empty board (Settings ▸ Data)", "总是空棋盘 (设置 ▸ 数据)")
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

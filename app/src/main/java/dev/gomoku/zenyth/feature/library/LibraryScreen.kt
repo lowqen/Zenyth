@@ -200,8 +200,8 @@ private fun LibraryDetailPane(
         busy = busy,
         onBack = onBack,
         actions = LibraryDetailActions(
-            onOpenStart = { viewModel.open(id, OpenAt.Start) },
-            onOpenLine = { viewModel.open(id, OpenAt.Line(it)) },
+            onOpenStart = { viewModel.requestOpen(id, OpenAt.Start) },
+            onOpenLine = { viewModel.requestOpen(id, OpenAt.Line(it)) },
             onOpenEditor = { viewModel.open(id, OpenAt.Keep) },
             onRename = { sheet = DetailSheet.RENAME },
             onCover = { sheet = DetailSheet.COVER },
@@ -212,6 +212,15 @@ private fun LibraryDetailPane(
             onStopScan = viewModel::stopScan,
         ),
     )
+    val clash by viewModel.ruleClash.collectAsStateWithLifecycle()
+    clash?.let { c ->
+        RuleClashDialog(
+            c,
+            onSwitch = viewModel::openWithDbRule,
+            onAnyway = viewModel::openDespiteRule,
+            onDismiss = viewModel::dismissRuleClash,
+        )
+    }
     when (sheet) {
         DetailSheet.RENAME -> RenameSheet(ui, onDismiss = { sheet = null }) { title, alsoFile ->
             sheet = null
@@ -512,6 +521,45 @@ private fun TrashFold(rows: List<TrashRow>, actions: LibraryHomeActions) {
             }
         }
     }
+}
+
+/**
+ * «이 DB 열기» on a board of another rule or size (L5-6 P3) — the engine keys
+ * its records by rule, so the DB would look empty. [규칙 바꿔 열기] only when
+ * the size matches (a resize is the board's own business).
+ */
+@Composable
+internal fun RuleClashDialog(c: RuleClash, onSwitch: () -> Unit, onAnyway: () -> Unit, onDismiss: () -> Unit) {
+    val names = listOf("freestyle", "standard", "renju")
+    val db = LibraryFormat.rule("${names[c.db.rule]}-${c.db.size}")
+    val board = LibraryFormat.rule("${names.getOrElse(c.boardRule) { "renju" }}-${c.boardSize}")
+    val dbRule = db.substringBeforeLast(' ')
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("규칙이 다릅니다", "Another rule", "规则不同")) },
+        text = {
+            Text(
+                tr(
+                    "이 DB 는 대부분 $db 국면입니다. 지금 판은 $board 입니다 — 이대로 열면 엔진이 DB 의 기록을 찾지 못합니다.",
+                    "Most of this DB is $db. The board is $board — opened like this, the engine finds none of its records.",
+                    "此数据库大多是 $db 局面。当前棋盘是 $board——这样打开，引擎找不到其中的记录。",
+                ),
+            )
+        },
+        confirmButton = {
+            if (c.canSwitch) {
+                Button(onClick = onSwitch) { Text(tr("${dbRule}로 바꿔 열기", "Switch to $dbRule and open", "改为${dbRule}并打开")) }
+            } else {
+                Button(onClick = onAnyway) { Text(tr("그대로 열기", "Open anyway", "仍然打开")) }
+            }
+        },
+        dismissButton = {
+            Row {
+                if (c.canSwitch) TextButton(onClick = onAnyway) { Text(tr("그대로 열기", "Open anyway", "仍然打开")) }
+                TextButton(onClick = onDismiss) { Text(tr("취소", "Cancel", "取消")) }
+            }
+        },
+    )
 }
 
 /** The question before «완전 삭제» — the file goes, and nothing brings it back. */

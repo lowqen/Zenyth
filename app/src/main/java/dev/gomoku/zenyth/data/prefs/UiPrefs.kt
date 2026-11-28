@@ -65,6 +65,12 @@ class UiPrefs @Inject constructor(
      */
     val curriculumAutoUpdate: BoolPref get() = bool("curriculum.autoupdate", true)
 
+    /** «DB 길목 표시» — records without a value as small rings on the board (L5-6 P3). On by default. */
+    val dbWaypoints: BoolPref get() = bool("db.waypoints", true)
+
+    /** «DB 열 때 시작 국면» ([dev.gomoku.zenyth.domain.library.StartMode] key). */
+    val libraryOpenAt: StringPref get() = string(dev.gomoku.zenyth.domain.library.StartMode.PREF, dev.gomoku.zenyth.domain.library.StartMode.BRANCH.key)
+
     /** Whether [key] has ever been written — a default that depends on that needs it. */
     fun contains(key: String): Boolean = prefs.contains(key)
 

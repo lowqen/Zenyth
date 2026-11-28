@@ -22,6 +22,7 @@ import dev.gomoku.zenyth.domain.library.LibraryEntries
 import dev.gomoku.zenyth.domain.library.LibraryEntry
 import dev.gomoku.zenyth.domain.library.LibraryFileNames
 import dev.gomoku.zenyth.domain.library.LibraryPositions
+import dev.gomoku.zenyth.domain.library.StartMode
 import dev.gomoku.zenyth.domain.library.yxdb.DbStats
 import dev.gomoku.zenyth.domain.repository.DatabaseRepository
 import dev.gomoku.zenyth.domain.repository.SettingsRepository
@@ -91,7 +92,7 @@ data class LibraryState(
 
 /** Where [LibraryRepository.open] puts the board. */
 sealed interface OpenAt {
-    /** The record's start (the largest root); the board stays when there are no roots. */
+    /** The record's start ([StartMode]: where it branches, the largest root, or empty); the board stays when there are no roots. */
     data object Start : OpenAt
     /** The board as it is (the editor). */
     data object Keep : OpenAt
@@ -545,7 +546,7 @@ class LibraryRepository @Inject constructor(
      * on the server. With the engine off the attachment is recorded and the
      * next start opens it. «DB 사용» comes on when it was off.
      */
-    suspend fun open(id: String, at: OpenAt, boardSize: Int): OpenOutcome {
+    suspend fun open(id: String, at: OpenAt, boardSize: Int, mode: StartMode = StartMode.BRANCH): OpenOutcome {
         val it0 = item(id) ?: return OpenOutcome.Refused(tr("라이브러리에 없는 DB 입니다", "That DB is not in the library", "资料库中没有该数据库"))
         if (!endpoints.localMode.first()) {
             return OpenOutcome.Refused(tr("서버 엔진에서는 열 수 없습니다 — 설정 ▸ 엔진에서 기기 내 엔진으로 바꾼 뒤 여세요", "Only the engine on this phone opens library DBs — switch in Settings ▸ Engine", "服务器引擎无法打开，请在 设置 ▸ 引擎 中切换到本机引擎"))
@@ -560,7 +561,7 @@ class LibraryRepository @Inject constructor(
         val now = System.currentTimeMillis()
         runCatching { edit(src) { l -> l.map { if (it.id == id) it.copy(lastOpenedAt = now) else it } } }
         val moves = when (at) {
-            OpenAt.Start -> LibraryPositions.startMovesOf(it0.entry.stats, boardSize)
+            OpenAt.Start -> LibraryPositions.startMovesOf(it0.entry.stats, boardSize, mode)
             OpenAt.Keep -> null
             is OpenAt.Line -> at.moves
         }

@@ -77,7 +77,7 @@ class DatabaseAggregator {
 
             is EngineResponse.DbCellValue -> {
                 val label = decodeTag(response.packedTag)
-                if (label.isEmpty() && response.text.isEmpty()) {
+                if (label.isEmpty() && response.text.isEmpty() && response.packedTag >= 0) {
                     cells.remove(response.move)
                 } else {
                     cells[response.move] = DbCell(
@@ -85,6 +85,8 @@ class DatabaseAggregator {
                         tagLabel = label,
                         text = response.text,
                         fields = response.fields,
+                        // a record without a label: Yixin's `boardtag != 0` (main.c:1987)
+                        waypoint = response.packedTag < 0 && label.isEmpty(),
                     )
                 }
                 snapshot()
