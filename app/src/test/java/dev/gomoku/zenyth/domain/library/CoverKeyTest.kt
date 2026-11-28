@@ -77,4 +77,13 @@ class CoverKeyTest {
         assertThat(LibraryPositions.startMovesOf(stats(), 15)).isNull()
         assertThat(LibraryPositions.startMovesOf(null, 15)).isNull()
     }
+
+    @Test
+    fun `a root's start wins when the index found one`() {
+        val deep = listOf(Move(7, 7), Move(7, 6), Move(7, 5), Move(9, 9), Move(5, 7))
+        val roots = listOf(DbRoot(hex(15, emptyList()), 900, start = hex(15, deep)))
+        val out = LibraryPositions.startMovesOf(stats(roots = roots), 15)!!
+        assertThat(out).hasSize(5)
+        assertThat(hex(15, out)).isEqualTo(roots[0].start)
+    }
 }

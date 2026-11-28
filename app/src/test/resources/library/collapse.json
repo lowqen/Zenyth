@@ -1,0 +1,59 @@
+{
+ "stats": {
+  "records": 110,
+  "rules": {
+   "renju-15": 110
+  },
+  "labels": {
+   "W": 32,
+   "L": 16,
+   "D": 16,
+   "other": 16
+  },
+  "commented": 16,
+  "indexVersion": 3,
+  "openings": [
+   83,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   2,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   25
+  ],
+  "roots": [
+   {
+    "key": "020f0f",
+    "subtree": 110,
+    "start": "020f0f0707"
+   }
+  ]
+ },
+ "count": 111,
+ "compressed": true,
+ "sorted": true,
+ "duplicates": 0,
+ "countOrdered": true,
+ "special": 1,
+ "openingsSkipped": null
+}

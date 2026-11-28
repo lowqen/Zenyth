@@ -64,6 +64,13 @@ class LibraryGoldenTest {
 
     @Test fun orphansBecomeRootsAndUnclassified() = check("orphans")
 
+    /**
+     * Index version 3 (L5-6): a symmetric non-standard parent casts no vote (the
+     * Phone Copy collapse), a mixed merge spreads to its children, and the
+     * empty-board root carries its start.
+     */
+    @Test fun nonStandardParentsDoNotCollapseOpenings() = check("collapse")
+
     @Test
     fun threeStoneClassificationMatchesTheWeb() {
         val chars = "0123456789abcdefghijklmnopq"

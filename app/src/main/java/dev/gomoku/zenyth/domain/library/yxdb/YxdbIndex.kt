@@ -22,11 +22,21 @@ import java.io.InputStream
  *    flag sort), insertion-sorted inside buckets.
  * 2. Pass 2: for each record, its parent candidates (one stone of the side
  *    that moved last removed). Engine files are count-ordered, so parents are
- *    settled first — every parent's opening is looked at: all equal → that
- *    one; any different, unclassified, or none found → unclassified (§5: no
- *    guessing). Three-stone positions go through `Opening26.classify`.
+ *    settled first — every parent's opening is looked at (index version 3, L5-6):
+ *    - only parents with an opening (0..25) vote: all equal → that one, any
+ *      different → **mixed** (`MIXED` = 27, inside the index only);
+ *    - non-standard / unclassified parents (26) do not vote — one symmetric
+ *      non-standard parent used to turn a standard line's whole subtree
+ *      unclassified (field check: 8.07 M → 3);
+ *    - a mixed parent passes mixed on; no votes (no parent, or only 26) → 26.
+ *    No guessing (§5): mixed goes out as 26. Three-stone positions go through
+ *    `Opening26.classify`.
  * 3. Subtree sizes: add each slot into its first parent, largest stone count
  *    first. A slot with no parent is a root; keep the largest N.
+ * 4. Start: from each root, while the heaviest child holds at least 9/10 of
+ *    what lies below, go down (L5-6 decision 1 — the engine's empty lookup
+ *    records make the largest root an empty board; the records really start
+ *    where they branch).
  *
  * Files not in stone-count order (written by other programs) skip openings
  * (`openingsSkipped = UNORDERED`) and still produce roots.
@@ -40,6 +50,11 @@ data class DbRoot(
     val key: String,
     /** Positions in the subtree linked by first parents (itself included). */
     val subtree: Long,
+    /**
+     * Start key (hex): from the root, down while the heaviest child holds 9/10
+     * of what lies below. Absent when that is the root itself. Index version 3.
+     */
+    val start: String? = null,
 )
 
 @Serializable
@@ -58,11 +73,8 @@ data class DbStats(
     /** The index version that counted these ([YxdbIndex.INDEX_VERSION]); absent = 1 (no rule salt). */
     val indexVersion: Int? = null,
 ) {
-    /**
-     * Trustworthy under the current index — an older version is still exact
-     * when the file holds one rule · board only (web `statsCurrent`).
-     */
-    val current: Boolean get() = indexVersion == YxdbIndex.INDEX_VERSION || rules.size <= 1
+    /** Trustworthy under the current index (web `statsCurrent`). */
+    val current: Boolean get() = (indexVersion ?: 1) >= YxdbIndex.INDEX_VERSION
 }
 
 enum class ScanPhase { STATS, HASH, LINK, ROOTS }
@@ -98,13 +110,17 @@ fun interface ClassifiedFn {
 
 object YxdbIndex {
     /**
-     * 2 = rule · board salt in the hash (L5-0). Version 1 merged equal stones of
-     * different rules, so only mixed-rule stats of version 1 are recounted.
+     * 2 = rule · board salt in the hash (L5-0). 3 = non-standard parents cast
+     * no opening vote, only mixed ones spread; roots carry a start (L5-6).
+     * Below 3 even one-rule files may hold collapsed openings: all recounted once.
      */
-    const val INDEX_VERSION = 2
+    const val INDEX_VERSION = 3
 
     const val BYTES_PER_RECORD = 16
-    const val UNCLASSIFIED = Opening26.NONSTD // 26
+    const val UNCLASSIFIED = Opening26.NONSTD // 26 — casts no vote
+    /** Parents' openings disagree — inside the index only; out (counts · [ClassifiedFn]) it folds to 26. */
+    private const val MIXED = 27
+    private fun outward(o: Int) = if (o == MIXED) UNCLASSIFIED else o
     private const val ROOT_KEY_CAP = 8 shl 20
 
     internal fun log2Ceil(v: Double): Int = kotlin.math.ceil(kotlin.math.log2(v)).toInt()
@@ -263,7 +279,7 @@ object YxdbIndex {
                         val own = ix.find(hasher.hi, hasher.lo)
                         if (own < 0 || ix.visited(own)) {
                             // The same position again — only the first counts.
-                            onClassified?.classified(b, ko, kl, vo, vl, if (own < 0) UNCLASSIFIED else ix.openingOf(own))
+                            onClassified?.classified(b, ko, kl, vo, vl, if (own < 0) UNCLASSIFIED else outward(ix.openingOf(own)))
                             return@read true
                         }
                         records++
@@ -295,8 +311,12 @@ object YxdbIndex {
                                 if (j < 0) continue
                                 if (first < 0) first = j
                                 val pj = ix.openingOf(j)
-                                if (op == -1) op = pj else if (pj != op) op = UNCLASSIFIED
-                                if (op == UNCLASSIFIED) break
+                                if (pj == UNCLASSIFIED) continue // a non-standard parent has no vote
+                                if (pj == MIXED || (op != -1 && pj != op)) {
+                                    op = MIXED
+                                    break
+                                }
+                                op = pj
                             }
                         }
                         parent[own] = first
@@ -307,9 +327,9 @@ object YxdbIndex {
                             else -> op
                         }
                         ix.setOpening(own, o)
-                        onClassified?.classified(b, ko, kl, vo, vl, o)
+                        onClassified?.classified(b, ko, kl, vo, vl, outward(o))
                         if (cls) {
-                            counts[o]++
+                            counts[outward(o)]++
                             classified++
                         }
                         if (first < 0 && !rootKeysDropped) {
@@ -372,7 +392,62 @@ object YxdbIndex {
                     )
                 }
             }
-            val roots = (0 until topN).map { DbRoot(rootKeys[topS[it]] ?: "", topZ[it]) }
+            // Start — keys read only where it differs from the root. The hashes are gone
+            // (hi = size), so a record matches by stone count, the hash's low half and
+            // its first parent's low half. A one-rule count-ordered file stops past the
+            // deepest start's stone count (each rule starts its counts over).
+            val ends = ix.heavyEnds(IntArray(topN) { topS[it] })
+            val startKeys = HashMap<Int, String>()
+            val wantStart = LinkedHashSet<Int>()
+            for (i in 0 until topN) if (ends[i] != topS[i]) wantStart.add(ends[i])
+            if (wantStart.isNotEmpty()) {
+                val oneRuleOrdered = countOrdered && rules.size <= 1
+                val wantNs = HashSet<Int>()
+                var maxN = 0
+                for (e in wantStart) {
+                    wantNs.add(ix.stonesOf(e))
+                    maxN = maxOf(maxN, ix.stonesOf(e))
+                }
+                open().use { input ->
+                    Yxdb.read(
+                        input, total,
+                        onRecord = { b, ko, kl, _, _, _ ->
+                            if (!hasher.load(b, ko, kl)) return@read true
+                            if (oneRuleOrdered && hasher.n > maxN) return@read false
+                            if (hasher.n !in wantNs) return@read true
+                            hasher.hash()
+                            hasher.canon()
+                            var hit = -1
+                            for (e in wantStart) {
+                                if (ix.stonesOf(e) == hasher.n && ix.loOf(e) == hasher.lo) {
+                                    hit = e
+                                    break
+                                }
+                            }
+                            if (hit < 0) return@read true
+                            val pl = ix.loOf(parent[hit])
+                            var parentOk = false
+                            var k = hasher.lastFrom
+                            val to = hasher.lastTo
+                            while (k < to && !parentOk) {
+                                hasher.without(k)
+                                parentOk = hasher.lo == pl
+                                k++
+                            }
+                            if (!parentOk) return@read true
+                            wantStart.remove(hit)
+                            startKeys[hit] = YxdbKey.toHex(b, ko, kl)
+                            wantStart.isNotEmpty()
+                        },
+                        onChunk = { loaded, tot -> if (tot > 0) progress(ScanPhase.ROOTS, loaded.toDouble() / tot) },
+                        isCancelled = cancelledOrDropped,
+                    )
+                }
+            }
+            val roots = (0 until topN).map {
+                val start = if (ends[it] != topS[it]) startKeys[ends[it]] else null
+                DbRoot(rootKeys[topS[it]] ?: "", topZ[it], start)
+            }
             progress(ScanPhase.ROOTS, 1.0)
             val tEnd = System.nanoTime()
             ms[ScanPhase.ROOTS] = (tEnd - tLink) / 1_000_000
@@ -694,9 +769,17 @@ internal class Index(n: Int) {
         }
     }
 
+    /** Stone-count order list (after [subtreeSizes], until [heavyEnds]); null = it went into lo, no starts. */
+    private var order: IntArray? = null
+    /** Slots with n stones sit at [layer[n], layer[n + 1]) of [order]. */
+    private var layer: IntArray? = null
+
     /**
-     * After pass 2 the hashes are done with: hi becomes the subtree size, lo the
-     * stone-count order list; add slots into their first parent, largest count first.
+     * After pass 2 hashes are no longer looked up: hi becomes the subtree size;
+     * add slots into their first parent, largest count first. The stone-count
+     * order list gets its own array (4 bytes a record, where the bloom was) so
+     * lo — the hash's low half — survives for finding the start keys; if that
+     * array cannot be had, the list goes into lo and starts are skipped.
      */
     fun subtreeSizes() {
         val s = sl
@@ -707,18 +790,85 @@ internal class Index(n: Int) {
             s[3 * k] = 1
             maxN = maxOf(maxN, nOf(s[3 * k + 2]))
         }
+        val ord = try {
+            IntArray(m)
+        } catch (_: OutOfMemoryError) {
+            null
+        }
         val cnt = IntArray(maxN + 2)
         for (k in 0 until m) cnt[nOf(s[3 * k + 2]) + 1]++
         for (k in 0..maxN) cnt[k + 1] += cnt[k]
-        for (k in 0 until m) s[3 * cnt[nOf(s[3 * k + 2])]++ + 1] = k
-        for (k in m - 1 downTo 0) {
-            val x = s[3 * k + 1]
-            val p = parent[x]
-            if (p >= 0) s[3 * p] += s[3 * x]
+        val lay = cnt.copyOf()
+        if (ord != null) {
+            for (k in 0 until m) ord[cnt[nOf(s[3 * k + 2])]++] = k
+            for (k in m - 1 downTo 0) {
+                val x = ord[k]
+                val p = parent[x]
+                if (p >= 0) s[3 * p] += s[3 * x]
+            }
+            order = ord
+            layer = lay
+        } else {
+            for (k in 0 until m) s[3 * cnt[nOf(s[3 * k + 2])]++ + 1] = k
+            for (k in m - 1 downTo 0) {
+                val x = s[3 * k + 1]
+                val p = parent[x]
+                if (p >= 0) s[3 * p] += s[3 * x]
+            }
         }
     }
 
     fun subtreeOf(s: Int): Long = sl[3 * s].toLong() and 0xffffffffL
+
+    /**
+     * Each root's start slot (after [subtreeSizes]): down while the heaviest
+     * first-parent child holds at least START_NUM / START_DEN of what lies below
+     * (the subtree less itself). Children have one stone more, so one layer is
+     * scanned. Without the order list, the roots themselves. Frees the list.
+     * Web `Index.heavyEnds`, step for step.
+     */
+    fun heavyEnds(roots: IntArray): IntArray {
+        val ends = roots.copyOf()
+        val ord = order
+        val lay = layer
+        order = null
+        layer = null
+        if (ord == null || lay == null) return ends
+        var active: List<Int> = roots.indices.toList()
+        while (active.isNotEmpty()) {
+            val byNode = LinkedHashMap<Int, MutableList<Int>>()
+            for (i in active) byNode.getOrPut(ends[i]) { ArrayList() }.add(i)
+            val layers = LinkedHashSet<Int>()
+            for (s in byNode.keys) layers.add(nOf(sl[3 * s + 2]) + 1)
+            val best = HashMap<Int, Int>()
+            for (n in layers) {
+                if (n + 1 >= lay.size) continue
+                for (k in lay[n] until lay[n + 1]) {
+                    val c = ord[k]
+                    val p = parent[c]
+                    if (p < 0 || p !in byNode) continue
+                    val b = best[p]
+                    if (b == null || subtreeOf(c) > subtreeOf(b) || (subtreeOf(c) == subtreeOf(b) && c < b)) best[p] = c
+                }
+            }
+            val next = ArrayList<Int>()
+            for ((s, list) in byNode) {
+                val c = best[s] ?: continue
+                if (subtreeOf(c) * START_DEN < (subtreeOf(s) - 1) * START_NUM) continue
+                for (i in list) {
+                    ends[i] = c
+                    next.add(i)
+                }
+            }
+            active = next
+        }
+        return ends
+    }
+
+    /** The hash's low half (kept only when [subtreeSizes] had its own order list). */
+    fun loOf(s: Int): Int = sl[3 * s + 1]
+
+    fun stonesOf(s: Int): Int = nOf(sl[3 * s + 2])
 
     fun release() {
         sl = IntArray(0)
@@ -728,5 +878,8 @@ internal class Index(n: Int) {
 
     private companion object {
         const val BLOOM_MUL = -0x61c8864f // 0x9e3779b1
+        /** Start: go down while the heaviest child holds 9/10 (L5-6 decision 1) — integers, like the web. */
+        const val START_NUM = 9L
+        const val START_DEN = 10L
     }
 }

@@ -14,7 +14,7 @@
    "other": 69
   },
   "commented": 69,
-  "indexVersion": 2,
+  "indexVersion": 3,
   "openings": [
    13,
    19,
@@ -47,19 +47,23 @@
   "roots": [
    {
     "key": "020f0f",
-    "subtree": 414
+    "subtree": 414,
+    "start": "020f0f0707"
    },
    {
     "key": "010f0f",
-    "subtree": 28
+    "subtree": 28,
+    "start": "010f0f0707"
    },
    {
     "key": "000f0f",
-    "subtree": 27
+    "subtree": 27,
+    "start": "000f0f0707"
    },
    {
     "key": "001414",
-    "subtree": 16
+    "subtree": 16,
+    "start": "0014140909"
    }
   ]
  },

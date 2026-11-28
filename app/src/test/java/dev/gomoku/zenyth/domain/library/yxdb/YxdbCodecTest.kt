@@ -193,11 +193,12 @@ class YxdbCodecTest {
     }
 
     @Test
-    fun oldStatsAreCurrentOnlyForOneRule() {
+    fun statsBelowVersionThreeAreRecountedEvenForOneRule() {
         val one = DbStats(3, mapOf("renju-15" to 3L), DbLabels(0, 0, 0, 0), 0)
-        assertThat(one.current).isTrue()
+        assertThat(one.current).isFalse() // no version = 1
+        assertThat(one.copy(indexVersion = 2).current).isFalse() // L5-6: openings may have collapsed
+        assertThat(one.copy(indexVersion = 3).current).isTrue()
         val mixed = one.copy(rules = mapOf("renju-15" to 2L, "standard-15" to 1L))
-        assertThat(mixed.current).isFalse()
         assertThat(mixed.copy(indexVersion = YxdbIndex.INDEX_VERSION).current).isTrue()
     }
 

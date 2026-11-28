@@ -33,11 +33,16 @@ object LibraryPositions {
 
     /**
      * Where the database's record starts — the largest root that reads on this
-     * board size (decision 2026-11-23: open a DB on its own position). Null
-     * without roots (the index was skipped) or when none fits.
+     * board size (decision 2026-11-23: open a DB on its own position), at its
+     * start when the index found one (down while the heaviest child holds 9/10,
+     * index version 3 — L5-6), else the root. Null without roots (the index was
+     * skipped) or when none fits.
      */
     fun startMovesOf(stats: DbStats?, size: Int): List<Move>? {
-        for (r in stats?.roots.orEmpty()) movesOfKey(r.key, size)?.let { return it }
+        for (r in stats?.roots.orEmpty()) {
+            val root = movesOfKey(r.key, size) ?: continue
+            return r.start?.let { movesOfKey(it, size) } ?: root
+        }
         return null
     }
 
