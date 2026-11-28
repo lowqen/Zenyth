@@ -8,8 +8,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
 
 /**
  * Copy · move an entry to another source (design §9-8): app storage is
@@ -26,9 +24,11 @@ import java.io.OutputStream
  *   new id, so it can still be restored from there for 30 days.
  *
  * The caller writes both sidecars (target first — a cut in between leaves the
- * id in two sources, which the next reconcile splits; nothing is lost). An
- * attached entry is folded first (L5-4). The bytes are copied in this process
- * for now; L5-3 hands [copyBytes] to the `:library` job.
+ * id in two sources, which the next reconcile splits; nothing is lost) and
+ * folds an attached entry first ([LibraryAttachController.foldForJob]). The
+ * bytes go through [copier] — on a device the `:library` job ([dev.gomoku.zenyth.data.library.job.JobCopier]),
+ * so the library's job line shows the copy and its [취소] stops it; a copy cut
+ * short leaves nothing in the target (atomic write).
  */
 object LibraryTransfer {
 
@@ -46,7 +46,7 @@ object LibraryTransfer {
         toEntries: List<LibraryEntry>,
         move: Boolean,
         now: Long = System.currentTimeMillis(),
-        copyBytes: suspend (InputStream, OutputStream) -> Unit = { i, o -> withContext(Dispatchers.IO) { i.copyTo(o, 256 * 1024) } },
+        copier: LibraryCopier = StreamCopier,
     ): Result {
         require(from.id != to.id) { "same source" }
         val want = from.fingerprint(entry.file) ?: throw FileNotFoundException(entry.file)
@@ -59,19 +59,17 @@ object LibraryTransfer {
             )
         }
         val journal = entry.file + ".journal"
-        val hasJournal = from.stat(journal) != null
+        val journalStat = from.stat(journal)
 
         val placed = to.writeAtomic(name) { staged ->
-            val input = from.openRead(entry.file) ?: throw FileNotFoundException(entry.file)
-            input.use { i -> staged.openOutput().use { o -> copyBytes(i, o) } }
+            val tail = copier.copy(want.size, from.copyFrom(entry.file), staged.copyTo())
             val got = withContext(Dispatchers.IO) { staged.openInput().use { Fingerprint.read(it, want.size, 0) } }
-            if (!got.sameFile(want)) throw IOException("copy of ${entry.file} does not match")
+            if (tail != want.tail || !got.sameFile(want)) throw IOException("copy of ${entry.file} does not match")
         }
-        if (hasJournal) {
+        if (journalStat != null) {
             try {
                 to.writeAtomic(name + ".journal", dropJournal = false) { staged ->
-                    val input = from.openRead(journal) ?: throw FileNotFoundException(journal)
-                    input.use { i -> staged.openOutput().use { o -> copyBytes(i, o) } }
+                    copier.copy(journalStat.size, from.copyFrom(journal), staged.copyTo())
                 }
             } catch (t: Throwable) {
                 runCatching { to.delete(name) }
@@ -96,4 +94,11 @@ object LibraryTransfer {
         }
         return Result(copied, sourceEntry)
     }
+
+    private fun LibrarySource.copyFrom(name: String) = CopyFrom(
+        { openRead(name) ?: throw FileNotFoundException(name) },
+        { openFd(name, "r") ?: throw FileNotFoundException(name) },
+    )
+
+    private fun StagedFile.copyTo() = CopyTo({ openOutput() }, { openFd("wt") })
 }

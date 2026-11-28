@@ -9,6 +9,9 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
+/** A copy the user cancelled (the job line's [취소]) — not a failure to report. */
+class CopyCancelled : IOException("copy cancelled")
+
 /** One end of a copy: the job process opens it by descriptor, tests by stream. */
 class CopyFrom(val stream: suspend () -> InputStream, val fd: suspend () -> ParcelFileDescriptor)
 class CopyTo(val stream: suspend () -> OutputStream, val fd: suspend () -> ParcelFileDescriptor)

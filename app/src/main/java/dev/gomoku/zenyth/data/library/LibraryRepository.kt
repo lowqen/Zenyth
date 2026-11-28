@@ -9,6 +9,7 @@ import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.core.model.Move
 import dev.gomoku.zenyth.data.library.job.ExpectedFile
 import dev.gomoku.zenyth.data.library.job.JobCopier
+import dev.gomoku.zenyth.data.library.job.JobOpRunner
 import dev.gomoku.zenyth.data.library.job.JobOutcome
 import dev.gomoku.zenyth.data.library.job.JobPriority
 import dev.gomoku.zenyth.data.library.job.JobResult
@@ -24,6 +25,8 @@ import dev.gomoku.zenyth.domain.library.LibraryFileNames
 import dev.gomoku.zenyth.domain.library.LibraryPositions
 import dev.gomoku.zenyth.domain.library.StartMode
 import dev.gomoku.zenyth.domain.library.yxdb.DbStats
+import dev.gomoku.zenyth.domain.library.yxdb.MergePolicy
+import dev.gomoku.zenyth.domain.library.yxdb.SplitPlan
 import dev.gomoku.zenyth.domain.repository.DatabaseRepository
 import dev.gomoku.zenyth.domain.repository.SettingsRepository
 import kotlinx.coroutines.CancellationException
@@ -46,6 +49,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -131,6 +136,7 @@ class LibraryRepository @Inject constructor(
     private val attach: LibraryAttachController,
     private val jobs: LibraryJobClient,
     private val copier: JobCopier,
+    opRunner: JobOpRunner,
     private val database: DatabaseRepository,
     private val settings: SettingsRepository,
     private val endpoints: EndpointStore,
@@ -151,6 +157,15 @@ class LibraryRepository @Inject constructor(
 
     /** «다시 세기» on stats that are current but short (openings · roots skipped): count them anyway, once. */
     private val forced = HashSet<String>()
+
+    /** Merge · split (L5-7) — the attached entry folds first, its folder copy goes home. */
+    private val ops = LibraryOps(opRunner, attach::foldForJob)
+
+    /** User ops running now: the background count waits for them ([nextToScan]). */
+    private val opsRunning = AtomicInteger(0)
+
+    /** Counts stopped to let an op run — they count again after, not «멈춤». */
+    private val preempted: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     // ── start ──────────────────────────────────────────────────────────
 
@@ -584,21 +599,130 @@ class LibraryRepository @Inject constructor(
         val from = sourceOf(it0.sourceId) ?: return noFolder()
         val to = sourceOf(toSourceId) ?: return noFolder()
         if (to.access.value != SourceAccess.GRANTED || from.access.value != SourceAccess.GRANTED) return lostFolder()
-        _state.update { it.copy(working = it.working + id) }
-        return try {
+        return gated(listOf(id)) {
+            try {
+                // The attached entry: its saves folded into the main file, a folder copy home first.
+                attach.foldForJob(id)?.let { reason ->
+                    return@gated tr("지금 DB 를 접어 저장하지 못했습니다: $reason", "Could not fold the DB first: $reason", "无法先合并保存数据库: $reason")
+                }
+                if (move) dropStagingOf(id)
+                val entry = item(id)?.entry ?: return@gated null
+                val r = LibraryTransfer.transfer(entry, from, to, entriesOf(to.id), move, copier = copier)
+                edit(to) { it + r.entry }
+                r.sourceEntry?.let { se -> edit(from) { l -> l.map { if (it.id == id) se else it } } }
+                null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                Log.w(TAG, "transfer of $id failed", t)
+                if (t is CopyCancelled) CANCELLED else messageOf(t)
+            }
+        }
+    }
+
+    // ── merge · split (L5-7) ───────────────────────────────────────────
+
+    private suspend fun inputOf(id: String): OpInput? {
+        val it0 = item(id) ?: return null
+        val src = sourceOf(it0.sourceId) ?: return null
+        return OpInput(src, it0.entry)
+    }
+
+    private fun notInLibrary() = tr("라이브러리에 없는 DB 입니다", "That DB is not in the library", "资料库中没有该数据库")
+
+    /** ③ 미리 보기 of a merge — [ids] top first (the base). */
+    suspend fun mergePreview(ids: List<String>, policy: MergePolicy, joinComments: Boolean): OpResult<MergePrepared> {
+        val inputs = ids.map { inputOf(it) ?: return OpResult.Failed(notInLibrary()) }
+        return gated(ids) { ops.previewMerge(inputs, policy, joinComments) }
+    }
+
+    /**
+     * [합치기] — the result is a new entry in the base's source, with the base's
+     * cover. [trashOriginals]: the inputs go to the trash after (the attached one
+     * stays) with the usual 10 s «되돌리기». Returns the new entry's id.
+     */
+    suspend fun merge(prep: MergePrepared, title: String, trashOriginals: Boolean): OpResult<String> {
+        val ids = prep.inputs.map { it.entry.id }
+        val target = prep.inputs.first().source
+        val cover = prep.inputs.first().entry.cover
+        val clean = title.trim().ifEmpty { LibraryOps.defaultMergeTitle(prep.inputs.map { it.entry.title }) }
+        val r: OpResult<String> = gated(ids) {
+            when (val done = ops.commitMerge(prep, clean, cover, target, entriesOf(target.id))) {
+                is OpResult.Done -> {
+                    edit(target) { it + done.value }
+                    OpResult.Done(done.value.id)
+                }
+                OpResult.Cancelled -> OpResult.Cancelled
+                is OpResult.Failed -> done
+            }
+        }
+        if (r is OpResult.Done && trashOriginals) {
+            val attached = store.attached()?.entryId
+            trash(ids.filter { it != attached })
+        }
+        return r
+    }
+
+    /**
+     * ① of a split: every criterion's counts. «이 국면 아래» counts under the
+     * board's position ([boardMoves]; none: that criterion has nothing).
+     */
+    suspend fun splitPreview(id: String, boardMoves: List<Move>, boardSize: Int): OpResult<SplitPrepared> {
+        val input = inputOf(id) ?: return OpResult.Failed(notInLibrary())
+        val base = LibraryPositions.splitBase(input.entry.stats, boardMoves, boardSize)
+        return gated(listOf(id)) { ops.previewSplit(input, base, jobs.indexBudget()) }
+    }
+
+    /**
+     * [나누기] — [results] as new entries beside the original; [move] makes the
+     * original the rest (its copy in the trash, «… (나누기 전)»). Returns the new ids.
+     */
+    suspend fun split(prep: SplitPrepared, plan: SplitPlan, results: List<SplitResultSpec>, move: Boolean): OpResult<List<String>> {
+        val id = prep.input.entry.id
+        val src = prep.input.source
+        return gated(listOf(id)) {
             if (move) dropStagingOf(id)
-            val r = LibraryTransfer.transfer(it0.entry, from, to, entriesOf(to.id), move)
-            edit(to) { it + r.entry }
-            r.sourceEntry?.let { se -> edit(from) { l -> l.map { if (it.id == id) se else it } } }
-            pump()
-            null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (t: Throwable) {
-            Log.w(TAG, "transfer of $id failed", t)
-            messageOf(t)
+            val done = ops.commitSplit(
+                prep, plan, results, move,
+                taken = entriesOf(src.id),
+                maxIndexBytes = jobs.indexBudget(),
+                attachedId = store.attached()?.entryId,
+            )
+            when (done) {
+                is OpResult.Done -> {
+                    val d = done.value
+                    edit(src) { l -> l.map { e -> if (e.id == id) d.replaced ?: e else e } + d.made + listOfNotNull(d.backup) }
+                    if (d.replaced != null) {
+                        attempts.remove(id)
+                        _state.update { it.copy(notes = it.notes - id) }
+                    }
+                    OpResult.Done(d.made.map { it.id })
+                }
+                OpResult.Cancelled -> OpResult.Cancelled
+                is OpResult.Failed -> done
+            }
+        }
+    }
+
+    /**
+     * A user op on [ids]: they show «작업 중» (rename · delete wait), and a
+     * background count running now is stopped so the op's job is next in the
+     * job queue — it counts again after, from the start.
+     */
+    private suspend fun <T> gated(ids: Collection<String>, body: suspend () -> T): T {
+        opsRunning.incrementAndGet()
+        _state.update { it.copy(working = it.working + ids) }
+        try {
+            val scanning = _state.value.scan?.entryId
+            if (scanning != null && jobs.active.value?.job is LibraryJob.Scan) {
+                preempted += scanning
+                jobs.cancel()
+            }
+            return body()
         } finally {
-            _state.update { it.copy(working = it.working - id) }
+            _state.update { it.copy(working = it.working - ids.toSet()) }
+            opsRunning.decrementAndGet()
+            pump()
         }
     }
 
@@ -648,6 +772,7 @@ class LibraryRepository @Inject constructor(
     }
 
     private fun nextToScan(): LibraryItem? {
+        if (opsRunning.get() > 0) return null
         val s = _state.value
         val granted = s.sources.filter { it.access == SourceAccess.GRANTED }.map { it.id }.toSet()
         return s.items.firstOrNull {
@@ -686,7 +811,11 @@ class LibraryRepository @Inject constructor(
                 is JobResult.Changed -> runCatching { load() }
                 else -> note(item.id, ScanNote.ERROR)
             }
-            JobOutcome.Cancelled -> if (_state.value.notes[item.id] == null) note(item.id, ScanNote.STOPPED)
+            JobOutcome.Cancelled -> when {
+                // Stopped for a merge · split · copy: not the user's «그만 세기».
+                preempted.remove(item.id) -> attempts[item.id] = ((attempts[item.id] ?: 1) - 1).coerceAtLeast(0)
+                _state.value.notes[item.id] == null -> note(item.id, ScanNote.STOPPED)
+            }
             is JobOutcome.Failed, JobOutcome.Died -> note(item.id, ScanNote.ERROR)
         }
     }
@@ -768,6 +897,9 @@ class LibraryRepository @Inject constructor(
     companion object {
         private const val TAG = "LibraryRepository"
         private const val MAX_ATTEMPTS = 3
+
+        /** [transfer]'s answer when the user cancelled its copy. */
+        val CANCELLED: String get() = tr("취소했습니다", "Cancelled", "已取消")
 
         /** The engine's DB6 journal header: a journal no longer than this holds no saves. */
         const val JOURNAL_HEADER = 32L

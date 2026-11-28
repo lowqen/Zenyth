@@ -1,9 +1,14 @@
 package dev.gomoku.zenyth.feature.library
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,6 +30,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -34,6 +41,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
@@ -53,6 +61,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,6 +83,8 @@ import dev.gomoku.zenyth.core.designsystem.component.RailLayoutMin
 import dev.gomoku.zenyth.core.designsystem.component.ZenythCollapsingTopBar
 import dev.gomoku.zenyth.core.designsystem.component.ZenythFilterChip
 import dev.gomoku.zenyth.core.designsystem.component.ZenythSegmented
+import dev.gomoku.zenyth.core.designsystem.component.ZenythTopBar
+import dev.gomoku.zenyth.core.designsystem.component.rememberZenythHaptics
 import dev.gomoku.zenyth.core.designsystem.cover.DbCover
 import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.data.library.OpenAt
@@ -88,6 +103,14 @@ class LibraryHomeActions(
     val onRestore: (String) -> Unit = {},
     val onPurge: (String) -> Unit = {},
     val onCancelJob: () -> Unit = {},
+    /** Long press — the pick mode starts with this card (L5-7). */
+    val onStartPick: (String) -> Unit = {},
+    /** A tap while picking. */
+    val onTogglePick: (String) -> Unit = {},
+    val onClearPicks: () -> Unit = {},
+    val onMergePicked: () -> Unit = {},
+    val onSplitPicked: () -> Unit = {},
+    val onTrashPicked: () -> Unit = {},
 )
 
 /**
@@ -98,6 +121,10 @@ class LibraryHomeActions(
  *
  * Folder chips (L4): [이 기기] [폴더: …] [+ 폴더]. A folder whose grant is gone
  * keeps its chip; the line under the chips offers «폴더 다시 허용».
+ *
+ * Pick mode (L5-7, design §6.2): a long press (0.5 s, with a buzz) picks a
+ * card and the header turns into «n개 선택 · [나누기] [합치기] [지우기] [✕]»;
+ * taps pick and unpick until ✕, back, or the last one unpicked.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,6 +168,12 @@ fun LibraryScreen(
             onRestore = { viewModel.restore(listOf(it)) },
             onPurge = { viewModel.purge(it) },
             onCancelJob = viewModel::cancelJob,
+            onStartPick = viewModel::startPick,
+            onTogglePick = viewModel::togglePick,
+            onClearPicks = viewModel::clearPicks,
+            onMergePicked = viewModel::openMerge,
+            onSplitPicked = { ui.picked.singleOrNull()?.let(viewModel::openSplit) },
+            onTrashPicked = viewModel::trashPicked,
         )
         if (!wide) {
             LibraryHome(ui, actions)
@@ -157,6 +190,52 @@ fun LibraryScreen(
                 }
             }
         }
+        LibraryOpSheets(viewModel, onMade = { id -> if (wide) viewModel.select(id) })
+    }
+}
+
+/** The merge and split sheets, wherever the view model opened them (L5-7). */
+@Composable
+private fun LibraryOpSheets(viewModel: LibraryViewModel, onMade: (String) -> Unit = {}) {
+    val merge by viewModel.mergeSheet.collectAsStateWithLifecycle()
+    val split by viewModel.splitSheet.collectAsStateWithLifecycle()
+    val job by viewModel.jobLine.collectAsStateWithLifecycle(initialValue = null)
+    merge?.let { m ->
+        LibraryMergeSheet(
+            m, job,
+            MergeSheetActions(
+                onMove = viewModel::moveMergeRow,
+                onPolicy = viewModel::setMergePolicy,
+                onJoin = viewModel::setMergeJoin,
+                onTitle = viewModel::setMergeTitle,
+                onTrash = viewModel::setMergeTrash,
+                onNext = viewModel::mergeNext,
+                onBack = viewModel::mergeBack,
+                onCommit = { viewModel.commitMerge(onMade) },
+                onClose = viewModel::closeMerge,
+                onCancelJob = viewModel::cancelJob,
+            ),
+        )
+    }
+    split?.let { u ->
+        LibrarySplitSheet(
+            u, job,
+            SplitSheetActions(
+                onCriterion = viewModel::setSplitCriterion,
+                onOpening = viewModel::toggleSplitOpening,
+                onGrouped = viewModel::setSplitGrouped,
+                onRule = viewModel::toggleSplitRule,
+                onMove = viewModel::setSplitMove,
+                onName = viewModel::setSplitName,
+                onNext = viewModel::splitNext,
+                onBack = viewModel::splitBack,
+                onCommit = { viewModel.commitSplit() },
+                onConfirmMove = { viewModel.commitSplit(confirmed = true) },
+                onDismissConfirm = viewModel::dismissSplitConfirm,
+                onClose = viewModel::closeSplit,
+                onCancelJob = viewModel::cancelJob,
+            ),
+        )
     }
 }
 
@@ -171,8 +250,14 @@ fun LibraryDetailScreen(
 ) {
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val pickers = rememberLibraryPickers(viewModel)
+    val job by viewModel.jobLine.collectAsStateWithLifecycle(initialValue = null)
     LibraryEffects(viewModel, onBoard = onBoard, onEditor = onEditor, onBack = onBack)
-    LibraryDetailPane(viewModel, id, busy, pickers, onBack = onBack, missing = onBack)
+    Box(Modifier.fillMaxSize()) {
+        LibraryDetailPane(viewModel, id, busy, pickers, onBack = onBack, missing = onBack)
+        // A copy started here («다른 곳으로») shows its progress and [취소] here too.
+        job?.let { JobBar(it, viewModel::cancelJob, Modifier.align(Alignment.BottomEnd).padding(16.dp)) }
+    }
+    LibraryOpSheets(viewModel)
 }
 
 /** A detail page with its sheets, from the view model. */
@@ -207,6 +292,7 @@ private fun LibraryDetailPane(
             onCover = { sheet = DetailSheet.COVER },
             onExport = { pickers.export(id, viewModel.exportName(ui.title)) },
             onTransfer = { sheet = DetailSheet.TRANSFER },
+            onSplit = { viewModel.openSplit(id) },
             onTrash = { viewModel.trash(id) },
             onRescan = { viewModel.rescan(id) },
             onStopScan = viewModel::stopScan,
@@ -304,9 +390,15 @@ fun LibraryHome(
     header: TopAppBarScrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(),
 ) {
     var adding by remember { mutableStateOf(false) }
+    BackHandler(enabled = ui.picking, onBack = actions.onClearPicks)
+    val onCard: (String) -> Unit = { id -> if (ui.picking) actions.onTogglePick(id) else actions.onCard(id) }
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().nestedScroll(header.nestedScrollConnection)) {
-            ZenythCollapsingTopBar(title = tr("라이브러리", "Library", "资料库"), scrollBehavior = header)
+            if (ui.picking) {
+                PickBar(ui, actions)
+            } else {
+                ZenythCollapsingTopBar(title = tr("라이브러리", "Library", "资料库"), scrollBehavior = header)
+            }
             LazyVerticalGrid(
                 columns = if (ui.list) GridCells.Fixed(1) else GridCells.Adaptive(148.dp),
                 modifier = Modifier.fillMaxSize(),
@@ -328,10 +420,11 @@ fun LibraryHome(
                     }
                 }
                 items(ui.cards, key = { it.id }) { card ->
+                    val picked = if (ui.picking) card.id in ui.picked else null
                     if (ui.list) {
-                        ListRow(card, card.id == ui.selectedId, onClick = { actions.onCard(card.id) })
+                        ListRow(card, card.id == ui.selectedId, picked, onClick = { onCard(card.id) }, onLongClick = { actions.onStartPick(card.id) })
                     } else {
-                        CoverCard(card, card.id == ui.selectedId, onClick = { actions.onCard(card.id) })
+                        CoverCard(card, card.id == ui.selectedId, picked, onClick = { onCard(card.id) }, onLongClick = { actions.onStartPick(card.id) })
                     }
                 }
                 if (ui.trash.isNotEmpty()) full("trash") { TrashFold(ui.trash, actions) }
@@ -343,13 +436,20 @@ fun LibraryHome(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             ui.job?.let { JobBar(it, actions.onCancelJob) }
-            Box {
+            if (!ui.picking) Box {
+                val addLabel = tr("추가", "Add", "添加")
                 ExtendedFloatingActionButton(
                     onClick = { if (!ui.blocked) adding = true },
                     icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text(tr("추가", "Add", "添加")) },
+                    // Said once, by the button's own name below.
+                    text = { Text(addLabel, Modifier.clearAndSetSemantics { }) },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    // Its name, said outright: uiautomator found none on the phone (L5-6).
+                    modifier = Modifier.semantics {
+                        contentDescription = addLabel
+                        role = Role.Button
+                    },
                 )
                 DropdownMenu(expanded = adding, onDismissRequest = { adding = false }) {
                     DropdownMenuItem(
@@ -448,14 +548,85 @@ private fun ToolsRow(ui: LibraryUiState, actions: LibraryHomeActions) {
     }
 }
 
+/**
+ * A card's touch: tap, and a long press that picks (L5-7). [picked] = null
+ * when not picking; otherwise the card reads as selected or not.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CoverCard(card: LibraryCard, selected: Boolean, onClick: () -> Unit) {
+private fun Modifier.cardTouch(picked: Boolean?, onClick: () -> Unit, onLongClick: () -> Unit): Modifier {
+    val haptics = rememberZenythHaptics()
+    val pickLabel = tr("고르기", "Pick", "选择")
+    return this
+        .combinedClickable(
+            role = Role.Button,
+            onClickLabel = if (picked != null) pickLabel else null,
+            onLongClickLabel = if (picked == null) pickLabel else null,
+            onLongClick = if (picked == null) {
+                {
+                    haptics.longPress()
+                    onLongClick()
+                }
+            } else {
+                null
+            },
+            onClick = onClick,
+        )
+        .then(if (picked != null) Modifier.semantics { selected = picked } else Modifier)
+}
+
+/** The pick mode's tick on a card. */
+@Composable
+private fun PickMark(picked: Boolean, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .background(if (picked) scheme.primary else scheme.surface.copy(alpha = 0.85f))
+            .border(2.dp, if (picked) scheme.primary else scheme.outline, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (picked) Icon(Icons.Filled.Check, null, Modifier.size(16.dp), tint = scheme.onPrimary)
+    }
+}
+
+/** The header while picking: how many, what can be done with them, ✕. */
+@Composable
+private fun PickBar(ui: LibraryUiState, actions: LibraryHomeActions) {
+    ZenythTopBar(
+        title = null,
+        leading = {
+            IconButton(onClick = actions.onClearPicks) {
+                Icon(Icons.Filled.Close, contentDescription = tr("고르기 끝내기", "Stop picking", "退出选择"))
+            }
+            Text(
+                tr("${ui.picked.size}개 선택", "${ui.picked.size} picked", "已选 ${ui.picked.size} 个"),
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+            )
+        },
+        actions = {
+            if (ui.picked.size == 1) {
+                TextButton(onClick = actions.onSplitPicked, enabled = ui.canSplit) { Text(tr("나누기", "Split", "拆分")) }
+            }
+            TextButton(onClick = actions.onMergePicked, enabled = ui.canMerge) { Text(tr("합치기", "Merge", "合并")) }
+            TextButton(onClick = actions.onTrashPicked, enabled = ui.canTrash) {
+                Text(tr("지우기", "Delete", "删除"), color = if (ui.canTrash) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+    )
+}
+
+@Composable
+private fun CoverCard(card: LibraryCard, selected: Boolean, picked: Boolean?, onClick: () -> Unit, onLongClick: () -> Unit) {
     val shape = RoundedCornerShape(16.dp)
+    val ring = selected || picked == true
     Column(
         Modifier
             .clip(shape)
-            .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
-            .clickable(role = Role.Button, onClick = onClick)
+            .then(if (ring) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
+            .cardTouch(picked, onClick, onLongClick)
             .padding(4.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -465,6 +636,7 @@ private fun CoverCard(card: LibraryCard, selected: Boolean, onClick: () -> Unit)
                 if (card.attached) PillBadge(tr("붙음", "Attached", "已连接"), accent = true)
                 if (card.working) PillBadge(tr("작업 중", "Working", "处理中"))
             }
+            if (picked != null) PickMark(picked, Modifier.align(Alignment.TopEnd).padding(6.dp))
         }
         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(card.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -474,14 +646,15 @@ private fun CoverCard(card: LibraryCard, selected: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-private fun ListRow(card: LibraryCard, selected: Boolean, onClick: () -> Unit) {
+private fun ListRow(card: LibraryCard, selected: Boolean, picked: Boolean?, onClick: () -> Unit, onLongClick: () -> Unit) {
     val shape = RoundedCornerShape(16.dp)
     Surface(
         shape = shape,
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().clip(shape).clickable(role = Role.Button, onClick = onClick),
+        color = if (selected || picked == true) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().clip(shape).cardTouch(picked, onClick, onLongClick),
     ) {
         Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (picked != null) PickMark(picked)
             DbCover(card.cover, Modifier.size(56.dp), seed = card.seed, corner = 10.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(card.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -592,8 +765,8 @@ internal fun PurgeConfirmDialog(title: String, onConfirm: () -> Unit, onDismiss:
 
 /** A copy or import at work (design §6.2 «작업 줄»): label, progress, [취소]. */
 @Composable
-private fun JobBar(job: JobLine, onCancel: () -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 2.dp) {
+private fun JobBar(job: JobLine, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 2.dp) {
         Row(
             Modifier.width(280.dp).padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,

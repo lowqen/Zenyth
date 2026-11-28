@@ -23,6 +23,12 @@ data class DatabaseUiState(
     val deleteDraft: DbDeleteScope = DbDeleteScope(),
     /** Engine-side file path for the file operations. */
     val path: String = "",
+    /**
+     * The engine runs on this phone: files are the library's (import · merge ·
+     * split · export there, L5-7), and the path commands — paths on the
+     * engine's machine — are only for a server engine.
+     */
+    val localEngine: Boolean = true,
     /** settings.txt line 47 — the font the comment editor uses. */
     val commentEditFont: FontSpec = FontSpec.DEFAULT,
 ) {

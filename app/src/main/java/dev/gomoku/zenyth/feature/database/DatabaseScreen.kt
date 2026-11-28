@@ -64,6 +64,7 @@ import dev.gomoku.zenyth.feature.board.CommentDialog
 @Composable
 fun DatabaseScreen(
     modifier: Modifier = Modifier,
+    onLibrary: () -> Unit = {},
     viewModel: DatabaseViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
@@ -84,7 +85,7 @@ fun DatabaseScreen(
         }
         PositionSection(ui, viewModel, onEditComment = { commentDraft = ui.db.snapshot.comment })
         RecordSection(ui, viewModel)
-        FileSection(ui, viewModel)
+        FileSection(ui, viewModel, onLibrary)
         StatusSection(ui, viewModel)
         BulkDeleteSection(ui, viewModel)
         LogSection(ui, viewModel)
@@ -295,9 +296,39 @@ private fun RecordSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
 }
 
 @OptIn(ExperimentalLayoutApi::class)
+/**
+ * The file commands (L5-7). On this phone's engine the DB is a library entry:
+ * importing, merging, splitting and exporting are the library's, so only what
+ * needs no path stays — save, check, repair. The path commands address files
+ * on the engine's machine and fold under «원격 서버 파일» for a server engine.
+ */
 @Composable
-private fun FileSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
-    Section(tr("파일 (엔진 서버 경로)", "File (path on the engine's machine)", "文件 (引擎服务器上的路径)")) {
+private fun FileSection(ui: DatabaseUiState, vm: DatabaseViewModel, onLibrary: () -> Unit) {
+    Section(tr("파일", "File", "文件")) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            AssistChip(onClick = vm::onSave, enabled = ui.canWrite, label = { Text(tr("저장", "Save", "保存")) })
+            AssistChip(onClick = vm::onCheck, label = { Text(tr("무결성 검사", "Check", "完整性检查")) })
+            AssistChip(onClick = vm::onFix, enabled = ui.canWrite, label = { Text(tr("복구", "Repair", "修复")) })
+        }
+        if (ui.localEngine) {
+            Text(
+                tr(
+                    "가져오기 · 합치기 · 나누기 · 내보내기는 라이브러리에서 합니다.",
+                    "Import, merge, split and export are in the library.",
+                    "导入、合并、拆分和导出请在资料库中进行。",
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onLibrary) { Text(tr("라이브러리로", "To the library", "前往资料库")) }
+        }
+    }
+    if (!ui.localEngine) RemoteFileSection(ui, vm)
+}
+
+@Composable
+private fun RemoteFileSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
+    FoldSection("db-remote-files", tr("원격 서버 파일", "Files on the server", "远程服务器文件"), summary = ui.path.ifBlank { null }) {
         OutlinedTextField(
             value = ui.path,
             onValueChange = vm::onPathChange,
@@ -306,7 +337,6 @@ private fun FileSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
             modifier = Modifier.fillMaxWidth(),
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            AssistChip(onClick = vm::onSave, enabled = ui.canWrite, label = { Text(tr("저장", "Save", "保存")) })
             AssistChip(
                 onClick = vm::onOpenFile,
                 enabled = ui.canWrite,
@@ -332,8 +362,6 @@ private fun FileSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
                 label = { Text(tr("CSV 가져오기", "Import CSV", "导入 CSV")) },
             )
             AssistChip(onClick = vm::onExportPositions, label = { Text(tr("국면 목록 (.pos)", "Position list (.pos)", "局面列表 (.pos)")) })
-            AssistChip(onClick = vm::onCheck, label = { Text(tr("무결성 검사", "Check", "完整性检查")) })
-            AssistChip(onClick = vm::onFix, enabled = ui.canWrite, label = { Text(tr("복구", "Repair", "修复")) })
         }
         Text(
             tr("경로는 엔진이 실행되는 서버에서 해석됩니다. PC와 같은 파일을 쓰므로 ", "Paths are resolved on the machine the engine runs on. It is the same file the PC uses, so", "路径在运行引擎的服务器上解析。由于与 PC 共用同一个文件，") +
@@ -344,7 +372,6 @@ private fun FileSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BulkDeleteSection(ui: DatabaseUiState, vm: DatabaseViewModel) {
     FoldSection("db-bulk", tr("일괄 삭제", "Bulk delete", "批量删除")) {

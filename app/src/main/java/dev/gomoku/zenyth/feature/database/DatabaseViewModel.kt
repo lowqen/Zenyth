@@ -12,6 +12,7 @@ import dev.gomoku.zenyth.core.model.FontSpec
 import dev.gomoku.zenyth.core.model.Position
 import dev.gomoku.zenyth.domain.repository.DatabaseRepository
 import dev.gomoku.zenyth.domain.repository.DbPreferences
+import dev.gomoku.zenyth.data.prefs.EndpointStore
 import dev.gomoku.zenyth.domain.repository.EngineRepository
 import dev.gomoku.zenyth.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +37,7 @@ class DatabaseViewModel @Inject constructor(
     private val engine: EngineRepository,
     private val settings: SettingsRepository,
     private val prefs: DbPreferences,
+    endpoints: EndpointStore,
 ) : ViewModel() {
 
     private val notice = MutableStateFlow<String?>(null)
@@ -53,10 +55,11 @@ class DatabaseViewModel @Inject constructor(
         val pendingDelete: DbDeleteScope?,
         val deleteDraft: DbDeleteScope,
         val path: String,
+        val localEngine: Boolean,
     )
 
-    private val local = combine(notice, pendingDelete, deleteDraft, pathDraft) { n, p, d, path ->
-        Local(n, p, d, path)
+    private val local = combine(notice, pendingDelete, deleteDraft, pathDraft, endpoints.localMode) { n, p, d, path, localEngine ->
+        Local(n, p, d, path, localEngine)
     }
 
     val uiState: StateFlow<DatabaseUiState> = combine(
@@ -74,6 +77,7 @@ class DatabaseViewModel @Inject constructor(
             pendingDelete = l.pendingDelete,
             deleteDraft = l.deleteDraft,
             path = l.path,
+            localEngine = l.localEngine,
             commentEditFont = FontSpec.parse(config.dbCommentFont2),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DatabaseUiState())

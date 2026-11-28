@@ -72,6 +72,8 @@ class LibraryDetailActions(
     val onCover: () -> Unit = {},
     val onExport: () -> Unit = {},
     val onTransfer: () -> Unit = {},
+    /** «나누기» (L5-7). */
+    val onSplit: () -> Unit = {},
     val onTrash: () -> Unit = {},
     val onRescan: () -> Unit = {},
     val onStopScan: () -> Unit = {},
@@ -433,6 +435,7 @@ private fun ColumnScope.ManageSection(ui: LibraryDetailUi, actions: LibraryDetai
             if (ui.targets.isNotEmpty()) {
                 OutlinedButton(onClick = actions.onTransfer, enabled = ui.size > 0 && !ui.working) { Text(tr("다른 곳으로", "To another place", "移到别处")) }
             }
+            OutlinedButton(onClick = actions.onSplit, enabled = ui.size > 0 && !ui.working) { Text(tr("나누기", "Split", "拆分")) }
             TextButton(onClick = actions.onTrash, enabled = !ui.attached && !ui.working) {
                 Text(tr("지우기", "Delete", "删除"), color = if (!ui.attached && !ui.working) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }

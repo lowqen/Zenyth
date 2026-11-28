@@ -59,6 +59,9 @@ object LibraryFileNames {
     fun withTail(base: String, tail: String): String =
         if (tail.startsWith("_")) DB.replace(base, "") + tail else base + tail
 
+    /** `<stem>_bak<N>.db` → `<stem>`; null for any other name. */
+    fun backupStem(name: String): String? = BACKUP_NAME.find(name)?.groupValues?.get(1)
+
     /**
      * Is this `.db` an engine backup — only when its main file (`<stem>.db`)
      * is in the same folder. [keys] = folder names through [key].

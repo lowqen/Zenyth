@@ -119,7 +119,7 @@ save_on_close = true
 
 # Number of backup files kept when saving
 # 数据库保存时保留备份的个数
-num_backups_on_save = 2
+num_backups_on_save = 1
 
 # Ignore corrupted database record when loading database file
 # 允许读取部分损坏的数据库

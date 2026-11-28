@@ -146,6 +146,27 @@ class AttachedDbStore(
             .forEach { it.delete() }
     }
 
+    /**
+     * The engine's numbered backups (`<stem>_bak<N>.db`, `num_backups_on_save`)
+     * of every file it does not hold now — app storage files and staging
+     * copies alike. Kept: the attached entry's, the one file the engine still
+     * saves into (L5-7: a 79MB DB left two full copies per entry behind).
+     * Returns how many went.
+     */
+    fun sweepBackups(): Int = synchronized(lock) {
+        val keep = attached()?.path?.let { File(it).name.replace(DB_EXT, "") }
+        var n = 0
+        for (dir in listOf(app.dir, stagingDir)) {
+            for (f in dir.listFiles().orEmpty()) {
+                if (!f.isFile) continue
+                val stem = LibraryFileNames.backupStem(f.name) ?: continue
+                if (stem == keep) continue
+                if (f.delete()) n++
+            }
+        }
+        n
+    }
+
     /** Copies cut short (`*.zenyth-tmp`) — before anything stages again. */
     fun sweepTemps() = synchronized(lock) {
         stagingDir.listFiles().orEmpty().filter { it.name.endsWith(TMP_SUFFIX) || it.name.endsWith(".json.tmp") }
@@ -191,6 +212,7 @@ class AttachedDbStore(
                 a = runCatching { newAppEntry(title) }.getOrNull() ?: return@withContext null
                 setAttached(a)
             }
+            runCatching { sweepBackups() }
             a.path
         }
     }
@@ -223,5 +245,6 @@ class AttachedDbStore(
         const val STAGING_DIR = "staging"
         const val ATTACHED_FILE = ".attached.json"
         private const val TMP_SUFFIX = LibraryFileNames.TMP
+        private val DB_EXT = Regex("\\.db$", RegexOption.IGNORE_CASE)
     }
 }

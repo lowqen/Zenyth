@@ -1,5 +1,6 @@
 package dev.gomoku.zenyth.data.library.job
 
+import dev.gomoku.zenyth.data.library.CopyCancelled
 import dev.gomoku.zenyth.data.library.CopyFrom
 import dev.gomoku.zenyth.data.library.CopyTo
 import dev.gomoku.zenyth.data.library.LibraryCopier
@@ -36,6 +37,7 @@ class JobCopier @Inject constructor(private val client: LibraryJobClient) : Libr
                 runCatching { output.close() }
             }
         }
+        if (out is JobOutcome.Cancelled) throw CopyCancelled()
         val r = (out as? JobOutcome.Done)?.result as? JobResult.Copied
             ?: throw IOException("copy: $out")
         if (r.bytes != size) throw IOException("copied ${r.bytes} of $size bytes")

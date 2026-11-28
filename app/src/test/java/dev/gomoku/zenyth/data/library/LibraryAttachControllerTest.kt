@@ -498,6 +498,95 @@ class LibraryAttachControllerTest {
         assertThat(cut.exists()).isFalse()
     }
 
+    // ── before a job reads an entry (L5-7) ─────────────────────────────
+
+    @Test
+    fun `a job on the attached entry folds it first`() = runBlocking<Unit> {
+        val r = Rig().started()
+        val a = r.appEntry("A")
+        r.attachApp(a)
+
+        assertThat(r.controller.foldForJob(a.id)).isNull()
+        assertThat(r.engine.sent).containsExactly("yxcompactdatabase")
+        assertThat(r.engine.idles).isEqualTo(1)
+    }
+
+    @Test
+    fun `a job on a resting entry needs nothing`() = runBlocking<Unit> {
+        val r = Rig().started()
+        val a = r.appEntry("A")
+        val b = r.appEntry("B")
+        r.attachApp(a)
+
+        assertThat(r.controller.foldForJob(b.id)).isNull()
+        assertThat(r.engine.sent).isEmpty()
+    }
+
+    @Test
+    fun `a failed fold says why and the job does not start`() = runBlocking<Unit> {
+        val r = Rig().started()
+        val a = r.appEntry("A")
+        r.attachApp(a)
+        r.engine.compactFails = true
+
+        assertThat(r.controller.foldForJob(a.id)).contains("disk full")
+    }
+
+    @Test
+    fun `a job on an attached folder entry sends its changes home first`() = runBlocking<Unit> {
+        val r = Rig().started()
+        val e = r.safEntry("연구.db", bytes(5000))
+        r.controller.switchTo(r.saf, e)
+        r.engineSaved(e, bytes(6000, seed = 3))
+        eventually("dirty") { r.store.markForEntry(e.id)!!.dirty }
+        val folded = bytes(6100, seed = 4)
+        r.foldsInto(e, folded)
+
+        assertThat(r.controller.foldForJob(e.id)).isNull()
+        assertThat(r.tree.bytes("연구.db")).isEqualTo(folded)
+        assertThat(r.store.markForEntry(e.id)!!.dirty).isFalse()
+    }
+
+    // ── the engine's numbered backups (L5-7) ───────────────────────────
+
+    @Test
+    fun `switching away drops the backups of the entry left behind`() = runBlocking<Unit> {
+        val r = Rig().started()
+        val a = r.appEntry("A")
+        val b = r.appEntry("B")
+        r.attachApp(a)
+        val aBak = File(r.app.dir, "${a.id}_bak1.db").apply { writeText("a") }
+        val bBak = File(r.app.dir, "${b.id}_bak1.db").apply { writeText("b") }
+
+        r.controller.switchTo(r.app, b)
+
+        assertThat(aBak.exists()).isFalse()
+        assertThat(bBak.exists()).isTrue() // the attached one's: the engine still saves into it
+    }
+
+    @Test
+    fun `boot drops every backup but the attached entry's, staging copies too`() = runBlocking<Unit> {
+        val r = Rig()
+        val a = r.appEntry("A")
+        r.attachApp(a)
+        val keep = File(r.app.dir, "${a.id}_bak1.db").apply { writeText("a") }
+        val other1 = File(r.app.dir, "other_bak1.db").apply { writeText("o") }
+        val other2 = File(r.app.dir, "other_bak2.db").apply { writeText("o") }
+        val main = File(r.app.dir, "other.db").apply { writeText("main") }
+        r.store.stagingDir.mkdirs()
+        val staged = File(r.store.stagingDir, "k_bak1.db").apply { writeText("s") }
+
+        assertThat(r.store.sweepBackups()).isEqualTo(3)
+        assertThat(keep.exists()).isTrue()
+        assertThat(main.exists()).isTrue()
+        assertThat(listOf(other1, other2, staged).none { it.exists() }).isTrue()
+
+        File(r.app.dir, "other_bak1.db").writeText("again")
+        r.store.bootPath("내 DB")
+        assertThat(File(r.app.dir, "other_bak1.db").exists()).isFalse()
+        assertThat(keep.exists()).isTrue()
+    }
+
     @Test
     fun `fingerprints line up with the tail rule`() {
         val f = File(tmp.root, "x.db").apply { writeBytes(bytes(5000)) }

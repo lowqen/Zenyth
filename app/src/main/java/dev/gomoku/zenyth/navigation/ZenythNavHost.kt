@@ -292,7 +292,9 @@ fun ZenythRoot() {
                                     onEditor = { navController.navigate(Routes.LIBRARY_EDIT) },
                                 )
                             }
-                            composable(Routes.LIBRARY_EDIT) { DatabaseScreen() }
+                            composable(Routes.LIBRARY_EDIT) {
+                                DatabaseScreen(onLibrary = { navController.popBackStack(Routes.LIBRARY_HOME, inclusive = false) })
+                            }
                         }
                         composable(Destination.Settings.route) { SettingsScreen() }
                         // The two tabs L5-5 took away, kept as routes so a back stack

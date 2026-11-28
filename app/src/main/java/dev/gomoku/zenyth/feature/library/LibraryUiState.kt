@@ -31,8 +31,10 @@ data class LibraryCard(
     val seed: Int,
     val subtitle: String,
     val attached: Boolean = false,
-    /** A copy · move is working on it. */
+    /** A copy · move · merge · split is working on it. */
     val working: Boolean = false,
+    /** It has a file (a new DB has none until its first save) — merge · split need one. */
+    val hasFile: Boolean = true,
 )
 
 data class TrashRow(val id: String, val title: String, val date: String)
@@ -54,9 +56,24 @@ data class LibraryUiState(
     val job: JobLine? = null,
     /** The detail open beside the grid (wide screens) — the chosen card. */
     val selectedId: String? = null,
+    /** The pick mode's cards (long press, L5-7), in the order picked; empty = not picking. */
+    val picked: List<String> = emptyList(),
 ) {
     /** The chosen chip cannot be written now (its folder grant is lost). */
     val blocked: Boolean get() = folder?.lost == true
+
+    val picking: Boolean get() = picked.isNotEmpty()
+
+    private val pickedCards: List<LibraryCard> get() = cards.filter { it.id in picked }
+
+    /** [합치기]: two or more, each with a file, none busy. */
+    val canMerge: Boolean get() = picked.size >= 2 && pickedCards.size == picked.size && pickedCards.all { it.hasFile && !it.working }
+
+    /** [나누기]: exactly one, with a file, not busy. */
+    val canSplit: Boolean get() = picked.size == 1 && pickedCards.singleOrNull()?.let { it.hasFile && !it.working } == true
+
+    /** [지우기]: the attached one stays (the repository says so). */
+    val canTrash: Boolean get() = pickedCards.any { !it.attached && !it.working }
 }
 
 data class JobLine(val label: String, val fraction: Float, val cancelling: Boolean)
@@ -148,10 +165,19 @@ object LibraryUiMapper {
             subtitle = sub,
             attached = item.id == s.attachedId,
             working = item.id in s.working,
+            hasFile = item.size > 0,
         )
     }
 
-    fun home(s: LibraryState, sourceId: String, sort: LibrarySort, list: Boolean, selectedId: String?, job: JobLine?): LibraryUiState {
+    fun home(
+        s: LibraryState,
+        sourceId: String,
+        sort: LibrarySort,
+        list: Boolean,
+        selectedId: String?,
+        job: JobLine?,
+        picked: List<String> = emptyList(),
+    ): LibraryUiState {
         val chips = chips(s.sources)
         val chosen = chips.firstOrNull { it.id == sourceId } ?: chips.firstOrNull()
         val id = chosen?.id ?: AppDirSource.ID
@@ -175,6 +201,8 @@ object LibraryUiMapper {
                 .map { TrashRow(it.id, it.entry.title, LibraryFormat.date(it.entry.trashedAt ?: 0L)) },
             job = job,
             selectedId = selectedId,
+            // Picks of another source, or gone, drop out.
+            picked = picked.filter { p -> rows.any { it.id == p } },
         )
     }
 

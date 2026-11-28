@@ -7,7 +7,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.gomoku.zenyth.core.common.BoardHandoff
 import dev.gomoku.zenyth.core.common.IncomingLinks
 import dev.gomoku.zenyth.core.i18n.tr
+import dev.gomoku.zenyth.data.library.LibraryOps
 import dev.gomoku.zenyth.data.library.LibraryRepository
+import dev.gomoku.zenyth.data.library.MergePrepared
+import dev.gomoku.zenyth.data.library.OpResult
+import dev.gomoku.zenyth.data.library.SplitPrepared
+import dev.gomoku.zenyth.data.library.SplitResultSpec
 import dev.gomoku.zenyth.data.library.LibraryUndo
 import dev.gomoku.zenyth.data.library.OpenAt
 import dev.gomoku.zenyth.data.library.OpenOutcome
@@ -18,6 +23,12 @@ import dev.gomoku.zenyth.domain.library.LibraryCover
 import dev.gomoku.zenyth.domain.library.LibraryFileNames
 import dev.gomoku.zenyth.domain.library.LibraryPositions
 import dev.gomoku.zenyth.domain.library.StartMode
+import dev.gomoku.zenyth.domain.library.Covers
+import dev.gomoku.zenyth.domain.library.yxdb.MergePolicy
+import dev.gomoku.zenyth.domain.library.yxdb.SplitCriterion
+import dev.gomoku.zenyth.domain.library.yxdb.SplitPlan
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.update
 import dev.gomoku.zenyth.domain.repository.SettingsRepository
 import dev.gomoku.zenyth.domain.repository.GameRepository
 import kotlinx.coroutines.channels.Channel
@@ -67,12 +78,19 @@ class LibraryViewModel @Inject constructor(
     private val listPref = prefs.bool("library.list", false)
     private val selected = MutableStateFlow<String?>(null)
 
-    private val jobLine: Flow<JobLine?> = jobs.active.map { a ->
+    /** Cards picked in the pick mode (long press, design §6.2), in the order picked. */
+    private val picks = MutableStateFlow<List<String>>(emptyList())
+
+    /** The job line (design §6.2) — also the merge · split sheets' progress. */
+    val jobLine: Flow<JobLine?> = jobs.active.map { a ->
         val job = a?.job ?: return@map null
         if (job is LibraryJob.Scan) return@map null
         JobLine(
             label = when (job) {
                 is LibraryJob.Copy -> tr("복사하는 중", "Copying", "复制中")
+                is LibraryJob.MergeCount, is LibraryJob.SplitCount -> tr("세는 중(미리 보기)", "Counting (preview)", "统计中（预览）")
+                is LibraryJob.MergeWrite -> tr("합치는 중", "Merging", "合并中")
+                is LibraryJob.SplitWrite -> tr("나누는 중", "Splitting", "拆分中")
                 else -> tr("작업 중", "Working", "处理中")
             },
             fraction = (a.progress?.fraction ?: 0.0).toFloat(),
@@ -81,9 +99,9 @@ class LibraryViewModel @Inject constructor(
     }.distinctUntilChanged()
 
     val uiState: StateFlow<LibraryUiState> = combine(
-        repo.state, sourcePref.state, sortPref.state, listPref.state, combine(selected, jobLine) { s, j -> s to j },
-    ) { s, source, sort, list, (sel, job) ->
-        LibraryUiMapper.home(s, source, runCatching { LibrarySort.valueOf(sort) }.getOrDefault(LibrarySort.RECENT), list, sel, job)
+        repo.state, sourcePref.state, sortPref.state, listPref.state, combine(selected, jobLine, picks) { s, j, p -> Triple(s, j, p) },
+    ) { s, source, sort, list, (sel, job, picked) ->
+        LibraryUiMapper.home(s, source, runCatching { LibrarySort.valueOf(sort) }.getOrDefault(LibrarySort.RECENT), list, sel, job, picked)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
     /** The page of entry [id] (null when it went away). */
@@ -170,7 +188,10 @@ class LibraryViewModel @Inject constructor(
 
     // ── view ───────────────────────────────────────────────────────────
 
-    fun selectSource(id: String) = sourcePref.set(id)
+    fun selectSource(id: String) {
+        picks.value = emptyList()
+        sourcePref.set(id)
+    }
     fun setSort(s: LibrarySort) = sortPref.set(s.name)
     fun setList(list: Boolean) = listPref.set(list)
     fun select(id: String?) {
@@ -249,6 +270,230 @@ class LibraryViewModel @Inject constructor(
 
     /** The name `CreateDocument` suggests for an export. */
     fun exportName(title: String): String = LibraryFileNames.fileNameFor(title)
+
+    // ── pick mode (L5-7) ───────────────────────────────────────────────
+
+    /** Long press: the pick mode starts with this card. */
+    fun startPick(id: String) {
+        picks.value = listOf(id)
+    }
+
+    /** A tap while picking. The last one unpicked ends the mode. */
+    fun togglePick(id: String) = picks.update { if (id in it) it - id else it + id }
+
+    fun clearPicks() {
+        picks.value = emptyList()
+    }
+
+    /** [지우기] — every picked one to the trash, one «되돌리기» for all. */
+    fun trashPicked() {
+        val ids = picks.value
+        if (ids.isEmpty()) return
+        picks.value = emptyList()
+        viewModelScope.launch { notify(repo.trash(ids)) }
+    }
+
+    // ── merge sheet (L5-7) ─────────────────────────────────────────────
+
+    private val _merge = MutableStateFlow<MergeUi?>(null)
+    val mergeSheet: StateFlow<MergeUi?> = _merge.asStateFlow()
+    private var mergePrep: MergePrepared? = null
+    private var mergeJob: Job? = null
+
+    /** [합치기] in the pick bar: the picked DBs in the order picked (the first = the base). */
+    fun openMerge() {
+        val s = repo.state.value
+        val rows = picks.value.mapNotNull { id -> s.items.firstOrNull { it.id == id } }.map { item ->
+            val stats = item.entry.stats
+            MergeRow(
+                id = item.id,
+                title = item.entry.title,
+                cover = Covers.keyOf(item.entry.cover, stats),
+                seed = item.entry.cover.seed,
+                subtitle = LibraryFormat.subtitle(stats, item.size),
+                rule = stats?.rules?.maxByOrNull { it.value }?.key,
+            )
+        }
+        if (rows.size < 2) return
+        mergePrep = null
+        _merge.value = MergeUi(rows, hasAttached = rows.any { it.id == s.attachedId })
+    }
+
+    /** ▲ (−1) · ▼ (+1) — the preview counts again. */
+    fun moveMergeRow(index: Int, by: Int) = _merge.update { m ->
+        val j = index + by
+        if (m == null || m.busy || j !in m.rows.indices) return@update m
+        val rows = m.rows.toMutableList()
+        rows[index] = rows[j].also { rows[j] = rows[index] }
+        mergePrep = null
+        m.copy(rows = rows, counts = null)
+    }
+
+    fun setMergePolicy(p: MergePolicy) = changeMergeCount { it.copy(policy = p) }
+    fun setMergeJoin(on: Boolean) = changeMergeCount { it.copy(joinComments = on) }
+
+    /** A choice the count depends on: the preview is dropped. */
+    private fun changeMergeCount(change: (MergeUi) -> MergeUi) {
+        val m = _merge.value ?: return
+        if (m.busy) return
+        mergePrep = null
+        _merge.value = change(m).copy(counts = null)
+    }
+    fun setMergeTitle(t: String) = _merge.update { it?.copy(title = t) }
+    fun setMergeTrash(on: Boolean) = _merge.update { it?.copy(trashOriginals = on) }
+
+    /** [다음] · [미리 보기]. Step ③ counts first. */
+    fun mergeNext() {
+        val m = _merge.value ?: return
+        if (m.busy) return
+        when (m.step) {
+            1 -> _merge.value = m.copy(step = 2, error = null)
+            2 -> previewMerge(m)
+        }
+    }
+
+    /** [이전] — a count on its way stops. */
+    fun mergeBack() {
+        val m = _merge.value ?: return
+        if (m.running) return
+        if (m.counting) mergeJob?.cancel()
+        _merge.value = m.copy(step = (m.step - 1).coerceAtLeast(1), counting = false, error = null)
+    }
+
+    private fun previewMerge(m: MergeUi) {
+        _merge.value = m.copy(
+            step = 3, counting = true, counts = null, error = null,
+            title = m.title.ifBlank { LibraryOps.defaultMergeTitle(m.rows.map { it.title }) },
+        )
+        mergeJob = viewModelScope.launch {
+            val r = repo.mergePreview(m.rows.map { it.id }, m.policy, m.joinComments)
+            _merge.update { cur ->
+                if (cur == null || cur.step != 3) return@update cur
+                when (r) {
+                    is OpResult.Done -> {
+                        mergePrep = r.value
+                        val x = r.value.summary
+                        cur.copy(counting = false, counts = MergeCounts(x.records, x.positions, x.overlaps, x.differing, x.inputPositions))
+                    }
+                    OpResult.Cancelled -> cur.copy(counting = false, step = 2)
+                    is OpResult.Failed -> cur.copy(counting = false, error = r.message)
+                }
+            }
+        }
+    }
+
+    /** [합치기] — written, read back, then a new entry. The sheet closes on success. */
+    fun commitMerge(onDone: (String) -> Unit = {}) {
+        val m = _merge.value ?: return
+        val prep = mergePrep ?: return
+        if (m.busy) return
+        _merge.value = m.copy(running = true, error = null)
+        mergeJob = viewModelScope.launch {
+            when (val r = repo.merge(prep, m.title, m.trashOriginals)) {
+                is OpResult.Done -> {
+                    _merge.value = null
+                    picks.value = emptyList()
+                    notify(tr("합쳤습니다 — «${m.title.trim()}»", "Merged into «${m.title.trim()}»", "已合并为«${m.title.trim()}»"))
+                    onDone(r.value)
+                }
+                OpResult.Cancelled -> {
+                    _merge.update { it?.copy(running = false) }
+                    notify(tr("합치기를 취소했습니다", "Merge cancelled", "已取消合并"))
+                }
+                is OpResult.Failed -> _merge.update { it?.copy(running = false, error = r.message) }
+            }
+        }
+    }
+
+    /** Closing the sheet stops its job (web: closing while it works cancels). */
+    fun closeMerge() {
+        if (_merge.value?.busy == true) mergeJob?.cancel()
+        _merge.value = null
+        mergePrep = null
+    }
+
+    // ── split sheet (L5-7) ─────────────────────────────────────────────
+
+    private val _split = MutableStateFlow<SplitUi?>(null)
+    val splitSheet: StateFlow<SplitUi?> = _split.asStateFlow()
+    private var splitPrep: SplitPrepared? = null
+    private var splitJob: Job? = null
+
+    /** [나누기] (the detail's «관리», or one card picked): counts every criterion once. */
+    fun openSplit(id: String) {
+        val s = repo.state.value
+        val item = s.items.firstOrNull { it.id == id } ?: return
+        if (item.size == 0L) return notify(tr("아직 파일이 없는 DB 입니다", "This DB has no file yet", "该数据库还没有文件"))
+        picks.value = emptyList()
+        splitPrep = null
+        val board = game.position.value
+        _split.value = SplitUi(item.id, item.entry.title, item.entry.cover, attached = item.id == s.attachedId, baseStones = board.moves.size)
+        splitJob = viewModelScope.launch {
+            val r = repo.splitPreview(id, board.moves, board.size)
+            _split.update { cur ->
+                if (cur == null || cur.id != id) return@update cur
+                when (r) {
+                    is OpResult.Done -> {
+                        splitPrep = r.value
+                        SplitPlanner.defaults(cur.copy(counting = false, counts = r.value.counts, baseStones = r.value.base?.let { it.black.size + it.white.size } ?: 0), r.value.counts)
+                    }
+                    OpResult.Cancelled -> null
+                    is OpResult.Failed -> cur.copy(counting = false, error = r.message)
+                }
+            }
+        }
+    }
+
+    fun setSplitCriterion(c: SplitCriterion) = _split.update { it?.copy(criterion = c, names = emptyMap()) }
+    fun toggleSplitOpening(i: Int) = _split.update { u -> u?.copy(picked = if (i in u.picked) u.picked - i else u.picked + i, names = emptyMap()) }
+    fun setSplitGrouped(on: Boolean) = _split.update { it?.copy(grouped = on, names = emptyMap()) }
+    fun toggleSplitRule(k: String) = _split.update { u -> u?.copy(rules = if (k in u.rules) u.rules - k else u.rules + k, names = emptyMap()) }
+    fun setSplitMove(on: Boolean) = _split.update { u -> u?.copy(move = on && !u.attached) }
+    fun setSplitName(index: Int, name: String) = _split.update { u -> u?.copy(names = u.names + (index to name)) }
+
+    fun splitNext() = _split.update { u -> if (u == null || u.busy || u.step >= 3) u else u.copy(step = u.step + 1, error = null) }
+    fun splitBack() = _split.update { u -> if (u == null || u.running) u else u.copy(step = (u.step - 1).coerceAtLeast(1), error = null, confirmMove = false) }
+    fun dismissSplitConfirm() = _split.update { it?.copy(confirmMove = false) }
+
+    /** [나누기] — a move asks first (the original becomes the rest). */
+    fun commitSplit(confirmed: Boolean = false, onDone: (List<String>) -> Unit = {}) {
+        val u = _split.value ?: return
+        val prep = splitPrep ?: return
+        if (u.busy) return
+        if (u.move && !confirmed) {
+            _split.value = u.copy(confirmMove = true)
+            return
+        }
+        val planned = SplitPlanner.planned(u)
+        if (planned.isEmpty()) return
+        val plan = SplitPlan(
+            criterion = u.criterion,
+            outputs = planned.map { it.out.toOutput() },
+            rest = if (u.move) SplitPlanner.rest(u, planned) else null,
+            base = if (u.criterion == SplitCriterion.UNDER) prep.base else null,
+        )
+        _split.value = u.copy(running = true, confirmMove = false, error = null)
+        splitJob = viewModelScope.launch {
+            when (val r = repo.split(prep, plan, planned.map { SplitResultSpec(it.out, it.title, it.cover) }, u.move)) {
+                is OpResult.Done -> {
+                    _split.value = null
+                    notify(tr("${r.value.size}개로 나눴습니다", "Split into ${r.value.size}", "已拆分为 ${r.value.size} 个"))
+                    onDone(r.value)
+                }
+                OpResult.Cancelled -> {
+                    _split.update { it?.copy(running = false) }
+                    notify(tr("나누기를 취소했습니다", "Split cancelled", "已取消拆分"))
+                }
+                is OpResult.Failed -> _split.update { it?.copy(running = false, error = r.message) }
+            }
+        }
+    }
+
+    fun closeSplit() {
+        if (_split.value?.busy == true) splitJob?.cancel()
+        _split.value = null
+        splitPrep = null
+    }
 
     // ── open ───────────────────────────────────────────────────────────
 

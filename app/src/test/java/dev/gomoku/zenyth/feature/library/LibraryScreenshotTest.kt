@@ -20,6 +20,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.gomoku.zenyth.core.designsystem.component.LocalWaveFrames
 import dev.gomoku.zenyth.core.designsystem.theme.ZenythTheme
 import dev.gomoku.zenyth.core.model.Move
+import dev.gomoku.zenyth.data.library.job.JobResult
 import dev.gomoku.zenyth.domain.library.CoverKey
 import dev.gomoku.zenyth.domain.library.LibraryCover
 import dev.gomoku.zenyth.domain.library.StartMode
@@ -116,6 +117,75 @@ class LibraryScreenshotTest(private val variant: Variant) {
         screen("library_detail_amoled", 411.dp, 1500.dp, dark = true, amoled = true, fileTag = null) {
             LibraryDetail(detailUi, LibraryDetailActions(), onBack = {})
         }
+    }
+
+    // ---- L5-7: pick mode · merge · split ------------------------------------
+
+    @Test
+    fun pickMode() = screen("library_select", 411.dp, 900.dp) { LibraryHome(homeUi.copy(picked = listOf("b", "a")), LibraryHomeActions()) }
+
+    private val mergeRows = listOf(
+        MergeRow("b", "화월 연구", CoverKey(1), 0, "렌주 · 4,210 국면", "renju-15"),
+        MergeRow("a", "연습 DB", CoverKey(4), 0, "렌주 · 12,840 국면", "renju-15"),
+        MergeRow("e", "자유룰 메모", CoverKey.E0, 2, "자유 · 310 국면", "freestyle-15"),
+    )
+
+    @Test
+    fun mergeStep1() {
+        assumeTrue(variant.fontScale == 1f)
+        shot("library_merge_step1") { MergeSheetBody(MergeUi(mergeRows, hasAttached = true), null, MergeSheetActions()) }
+    }
+
+    @Test
+    fun mergeStep2() {
+        assumeTrue(variant.fontScale == 1f)
+        shot("library_merge_step2") { MergeSheetBody(MergeUi(mergeRows, step = 2), null, MergeSheetActions()) }
+    }
+
+    @Test
+    fun mergeStep3() = shot("library_merge_step3") {
+        MergeSheetBody(
+            MergeUi(
+                mergeRows,
+                step = 3,
+                hasAttached = true,
+                counts = MergeCounts(records = 16_901, positions = 16_900, overlaps = 460, differing = 37, inputs = listOf(4210, 12_840, 310)),
+                title = "화월 연구 + 연습 DB + 자유룰 메모",
+            ),
+            null,
+            MergeSheetActions(),
+        )
+    }
+
+    private val splitCounts = JobResult.SplitCounted(
+        total = 12_840,
+        meta = true,
+        openings = List(27) { i -> when (i) { 4 -> 6200L; 1 -> 2100L; 16 -> 900L; 10 -> 120L; 26 -> 3520L; else -> 0L } },
+        under = 9300,
+        solved = 2_480,
+        rules = linkedMapOf("renju-15" to 12_500L, "freestyle-15" to 340L),
+    )
+
+    private val splitUi = SplitPlanner.defaults(
+        SplitUi("a", "연습 DB", LibraryCover(LibraryCover.AUTO, seed = 0), attached = true, counting = false, counts = splitCounts, baseStones = 3),
+        splitCounts,
+    )
+
+    @Test
+    fun splitStep1() {
+        assumeTrue(variant.fontScale == 1f)
+        shot("library_split_step1") { SplitSheetBody(splitUi, null, SplitSheetActions()) }
+    }
+
+    @Test
+    fun splitStep2() {
+        assumeTrue(variant.fontScale == 1f)
+        shot("library_split_step2") { SplitSheetBody(splitUi.copy(step = 2, attached = false, move = true), null, SplitSheetActions()) }
+    }
+
+    @Test
+    fun splitStep3() = shot("library_split_step3") {
+        SplitSheetBody(splitUi.copy(step = 3, attached = false, move = true, picked = setOf(4, 1)), null, SplitSheetActions())
     }
 
     /** Every cover, light and dark, side by side — the palette at a glance. */

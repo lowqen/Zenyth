@@ -3,6 +3,7 @@ package dev.gomoku.zenyth.domain.library
 import dev.gomoku.zenyth.core.model.Move
 import dev.gomoku.zenyth.core.model.Opening26
 import dev.gomoku.zenyth.domain.library.yxdb.DbStats
+import dev.gomoku.zenyth.domain.library.yxdb.SplitBase
 import dev.gomoku.zenyth.domain.library.yxdb.YxdbKey
 
 /**
@@ -71,14 +72,30 @@ object LibraryPositions {
      * board size; null without stats or when that is not a known square rule.
      * «이 DB 열기» warns when it differs from the board's (L5-6 P3).
      */
-    fun mainRuleOf(stats: DbStats?): DbRule? {
-        val name = stats?.rules?.maxByOrNull { it.value }?.key ?: return null
+    fun mainRuleOf(stats: DbStats?): DbRule? = stats?.rules?.maxByOrNull { it.value }?.key?.let(::parseRule)
+
+    private fun parseRule(name: String): DbRule? {
         val dash = name.lastIndexOf('-')
         if (dash <= 0) return null
         val rule = RULE_NAMES.indexOf(name.substring(0, dash))
         val size = name.substring(dash + 1).toIntOrNull() ?: return null
         return if (rule < 0) null else DbRule(rule, size)
     }
+
+    /**
+     * The board as «이 국면 아래»'s base for a split (L5-7, web `boardBase`): its
+     * stones, black and white alternating, under the DB's most common rule of
+     * this board size (renju when it has none). Null on an empty board.
+     */
+    fun splitBase(stats: DbStats?, moves: List<Move>, size: Int): SplitBase? {
+        if (moves.isEmpty()) return null
+        val rule = stats?.rules.orEmpty().entries
+            .mapNotNull { (k, n) -> parseRule(k)?.takeIf { it.size == size }?.let { it to n } }
+            .maxByOrNull { it.second }?.first?.rule ?: RENJU
+        return SplitBase(rule, size, moves.filterIndexed { i, _ -> i % 2 == 0 }, moves.filterIndexed { i, _ -> i % 2 == 1 })
+    }
+
+    private const val RENJU = 2
 
     private val RULE_NAMES = listOf("freestyle", "standard", "renju")
 

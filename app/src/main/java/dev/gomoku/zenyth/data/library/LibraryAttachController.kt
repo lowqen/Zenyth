@@ -219,6 +219,9 @@ class LibraryAttachController(
             runCatching { database.refresh() }
         }
         store.setAttached(target)
+        // The engine keeps numbered backups beside the file it saves; the entry left
+        // behind rests now and needs none (L5-7: 79MB each on a phone).
+        runCatching { withContext(Dispatchers.IO) { store.sweepBackups() } }
         // The entry left behind goes home after this returns — the switch does not wait for it.
         if (current != null && current.sourceId != AppDirSource.ID) {
             store.markForEntry(current.entryId)?.takeIf { it.dirty }?.let { m ->
@@ -226,6 +229,29 @@ class LibraryAttachController(
             }
         }
         AttachOutcome.Attached(target.path, live)
+    }
+
+    /**
+     * Before a job reads [entryId]'s file (merge · split · copy, L5-7): the
+     * attached entry is folded, so its main file stands alone, and a folder
+     * entry's staging copy holding changes goes home first. Null when the file
+     * at the source is now complete; otherwise why not. An entry neither
+     * attached nor staged returns at once.
+     */
+    suspend fun foldForJob(entryId: String): String? = lock.withLock {
+        val a = store.attached()?.takeIf { it.entryId == entryId }
+        if (a != null && engine.isLocal && engine.state.value.isLive && engine.holdsDatabase) {
+            engine.awaitIdle()
+            val folded = fold(File(a.path).length())
+            if (folded is Fold.Failed) return@withLock folded.reason
+            noteSavedNow(a)
+        }
+        val m = store.markForEntry(entryId)?.takeIf { it.dirty } ?: return@withLock null
+        when (val o = writeBack(m.key).also { report(it) }) {
+            is WriteBackOutcome.Deferred -> o.reason
+            is WriteBackOutcome.Conflict -> tr("폴더의 파일이 그새 바뀌어 기기 사본을 «${o.name}» 으로 따로 두었습니다. 다시 고르세요", "The folder's file changed meanwhile — this device's copy is now «${o.name}». Choose again", "文件夹中的文件已被修改，本机副本另存为«${o.name}»，请重新选择")
+            else -> null
+        }
     }
 
     private suspend fun targetOf(source: LibrarySource, entry: LibraryEntry): AttachedDb = when (source) {
