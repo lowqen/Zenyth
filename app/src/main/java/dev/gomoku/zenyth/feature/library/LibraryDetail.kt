@@ -206,7 +206,10 @@ private fun ScanLineCard(ui: LibraryDetailUi, actions: LibraryDetailActions) {
                 )
                 TextButton(onClick = actions.onRescan) { Text(tr("다시 세기", "Count again", "重新统计")) }
             }
-            ScanLine.MEMORY -> Hint(tr("주형 · 뿌리 통계는 이 기기의 메모리로는 생략했습니다.", "Openings and roots were skipped — not enough memory on this device.", "受本机内存所限，省略了开局与根局面统计。"))
+            ScanLine.MEMORY -> {
+                Hint(tr("주형 · 시작점 통계를 생략했습니다(메모리 부족 또는 시스템 중단).", "Openings and starting points were skipped (low memory, or the system stopped the count).", "已省略开局与起点统计（内存不足或被系统中断）。"))
+                TextButton(onClick = actions.onRescan) { Text(tr("다시 세기", "Count again", "重新统计")) }
+            }
             ScanLine.UNORDERED -> Hint(tr("이 파일은 국면 순서가 엔진과 달라 주형을 정하지 않았습니다.", "This file's positions are not in the engine's order, so openings were not settled.", "此文件的局面顺序与引擎不同，未判定开局。"))
             ScanLine.NONE -> Unit
         }

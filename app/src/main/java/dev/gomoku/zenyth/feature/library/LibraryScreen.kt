@@ -26,6 +26,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -483,6 +486,19 @@ private fun ListRow(card: LibraryCard, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun TrashFold(rows: List<TrashRow>, actions: LibraryHomeActions) {
+    // «완전 삭제» asks first (L5-6 decision): it is the one library action with no
+    // undo — the trash is the undo for everything else.
+    var confirm by remember { mutableStateOf<TrashRow?>(null) }
+    confirm?.let { r ->
+        PurgeConfirmDialog(
+            title = r.title,
+            onConfirm = {
+                confirm = null
+                actions.onPurge(r.id)
+            },
+            onDismiss = { confirm = null },
+        )
+    }
     DisclosureCard(id = "lib-trash", title = tr("휴지통 (${rows.size})", "Trash (${rows.size})", "回收站 (${rows.size})")) {
         Hint(tr("30일이 지나면 저절로 지워집니다.", "Deleted for good after 30 days.", "30 天后自动永久删除。"))
         rows.forEach { r ->
@@ -492,10 +508,38 @@ private fun TrashFold(rows: List<TrashRow>, actions: LibraryHomeActions) {
                     Text(r.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 TextButton(onClick = { actions.onRestore(r.id) }) { Text(tr("되돌리기", "Restore", "恢复")) }
-                TextButton(onClick = { actions.onPurge(r.id) }) { Text(tr("아주 지우기", "Delete", "彻底删除"), color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { confirm = r }) { Text(tr("완전 삭제", "Delete permanently", "永久删除"), color = MaterialTheme.colorScheme.error) }
             }
         }
     }
+}
+
+/** The question before «완전 삭제» — the file goes, and nothing brings it back. */
+@Composable
+internal fun PurgeConfirmDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("완전 삭제할까요?", "Delete permanently?", "要永久删除吗?")) },
+        text = {
+            Text(
+                tr(
+                    "«$title» 파일이 지워집니다. 되돌릴 수 없습니다.",
+                    "«$title» and its file are deleted. This cannot be undone.",
+                    "«$title» 的文件将被删除，且无法恢复。",
+                ),
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) { Text(tr("완전 삭제", "Delete permanently", "永久删除")) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("취소", "Cancel", "取消")) } },
+    )
 }
 
 /** A copy or import at work (design §6.2 «작업 줄»): label, progress, [취소]. */

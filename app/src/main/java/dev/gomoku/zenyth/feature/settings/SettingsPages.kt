@@ -41,6 +41,7 @@ import dev.gomoku.zenyth.core.designsystem.theme.themeFollowsSystem
 import dev.gomoku.zenyth.core.designsystem.theme.themeWallpaperTone
 import dev.gomoku.zenyth.core.designsystem.theme.wallpaperToneAvailable
 import dev.gomoku.zenyth.core.i18n.tr
+import dev.gomoku.zenyth.core.model.EngineIdlePolicy
 import dev.gomoku.zenyth.core.model.SettingCategory
 import dev.gomoku.zenyth.core.model.SettingsFile
 import dev.gomoku.zenyth.data.prefs.UiPrefs
@@ -127,7 +128,7 @@ internal fun settingsSections(
         SettingsPage.Root -> rootSections(ui, actions, pro)
         SettingsPage.Design -> designSections(ui, actions, prefs)
         SettingsPage.General -> generalSections(prefs)
-        SettingsPage.Engine -> engineSections(ui, actions, pro)
+        SettingsPage.Engine -> engineSections(ui, actions, pro, prefs)
         SettingsPage.Data -> dataSections(actions, prefs)
         SettingsPage.Desktop -> desktopSections(ui, actions)
     }
@@ -331,7 +332,7 @@ private fun SectionsBuilder.generalSections(prefs: UiPrefs?) {
 }
 // ---- 엔진 ------------------------------------------------------------------------------
 
-private fun SectionsBuilder.engineSections(ui: SettingsUiState, actions: SettingsActions, pro: Boolean) {
+private fun SectionsBuilder.engineSections(ui: SettingsUiState, actions: SettingsActions, pro: Boolean, prefs: UiPrefs?) {
     section("threads") {
         ConnectedGroup(title = tr("탐색", "Search", "搜索")) {
             row {
@@ -343,6 +344,23 @@ private fun SectionsBuilder.engineSections(ui: SettingsUiState, actions: Setting
                         selected = ui.localProfile.threads,
                         onSelect = actions.onThreads,
                     )
+                }
+            }
+            if (prefs != null) {
+                row {
+                    val stopMin by prefs.backgroundAnalysisStopMin.state.collectAsStateWithLifecycle()
+                    FieldRow(
+                        tr("앱을 떠난 뒤 분석 정지", "Stop analysis after leaving the app", "离开应用后停止分析"),
+                        note = tr("다른 앱을 쓰는 동안 분석이 밤새 돌지 않게", "So an analysis does not run all night in the background", "避免分析在后台通宵运行"),
+                    ) {
+                        ChoiceChips(
+                            options = EngineIdlePolicy.BACKGROUND_STOP_CHOICES.map { m ->
+                                m to if (m == 0) tr("끔", "Off", "关") else tr("${m}분", "$m min", "$m 分钟")
+                            },
+                            selected = stopMin,
+                            onSelect = { prefs.backgroundAnalysisStopMin.set(it) },
+                        )
+                    }
                 }
             }
         }

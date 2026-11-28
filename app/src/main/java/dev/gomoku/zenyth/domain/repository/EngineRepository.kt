@@ -49,6 +49,22 @@ interface EngineRepository {
      */
     val holdsDatabase: Boolean get() = false
 
+    /**
+     * The user wants a session: true from [connect] until [disconnect] (or a
+     * connect that failed). The foreground service lives by this rather than by
+     * [state], which reads `Disconnected` for a moment at the start of every
+     * connect — the moment a service that went by [state] stopped itself in
+     * (L5-6 field check: the engine then ran in a cached app, and the system
+     * killed it for the engine's CPU).
+     */
+    val sessionWanted: StateFlow<Boolean> get() = NO_SESSION
+
+    /**
+     * An analysis ([analyze]) is searching right now — not a game move, a
+     * balance, a review or a proof. What the background auto-stop watches.
+     */
+    val analysisRunning: StateFlow<Boolean> get() = NO_SESSION
+
     /** Open a session with [target] — the server across Tailscale, or this phone. */
     suspend fun connect(target: EngineTarget)
     suspend fun send(command: EngineCommand)
@@ -114,3 +130,5 @@ interface EngineRepository {
      */
     suspend fun awaitIdle() = Unit
 }
+
+private val NO_SESSION: StateFlow<Boolean> = kotlinx.coroutines.flow.MutableStateFlow(false)

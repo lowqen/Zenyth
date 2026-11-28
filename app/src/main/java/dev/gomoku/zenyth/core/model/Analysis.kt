@@ -101,4 +101,18 @@ data class AnalyzeParams(
      * that sets its own puts the game's back when it ends.
      */
     val timeLimitMs: Long? = null,
+    /**
+     * Run once the previous search has ended and before this one's board goes
+     * out — the one moment in an analysis-to-analysis hand-over when the engine
+     * answers anything else at once. The board uses it for the database query
+     * of the new position, which a search would otherwise hold back until it
+     * ends (L5-6 field check). Not part of equality: it is a callback.
+     */
+    val beforeSearch: BeforeSearch? = null,
 )
+
+/** See [AnalyzeParams.beforeSearch]. Equal to every other, so params still compare by their values. */
+class BeforeSearch(val run: suspend () -> Unit) {
+    override fun equals(other: Any?): Boolean = other is BeforeSearch
+    override fun hashCode(): Int = 0
+}

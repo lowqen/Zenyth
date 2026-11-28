@@ -148,6 +148,9 @@ class LibraryRepository @Inject constructor(
     @Volatile private var pumpJob: Job? = null
     private val attempts = HashMap<String, Int>()
 
+    /** «다시 세기» on stats that are current but short (openings · roots skipped): count them anyway, once. */
+    private val forced = HashSet<String>()
+
     // ── start ──────────────────────────────────────────────────────────
 
     private fun start() {
@@ -648,12 +651,13 @@ class LibraryRepository @Inject constructor(
         val granted = s.sources.filter { it.access == SourceAccess.GRANTED }.map { it.id }.toSet()
         return s.items.firstOrNull {
             it.size > 0 && it.sourceId in granted && s.notes[it.id] == null &&
-                it.entry.stats?.current != true && (attempts[it.id] ?: 0) < MAX_ATTEMPTS
+                (it.entry.stats?.current != true || it.id in forced) && (attempts[it.id] ?: 0) < MAX_ATTEMPTS
         }
     }
 
     private suspend fun scanOne(item: LibraryItem) {
         attempts[item.id] = (attempts[item.id] ?: 0) + 1
+        forced.remove(item.id)
         val src = sources.sourceOf(item.sourceId) ?: return note(item.id, ScanNote.ERROR)
         val file = item.entry.file
         val fp = runCatching { src.fingerprint(file) }.getOrNull()
@@ -719,6 +723,10 @@ class LibraryRepository @Inject constructor(
     /** «다시 세기». */
     fun rescan(id: String) {
         attempts.remove(id)
+        // Openings and roots skipped (memory, or the system stopping the count):
+        // the stats are current, so only being asked brings them round again.
+        val stats = item(id)?.entry?.stats
+        if (stats != null && stats.roots == null) forced += id
         _state.update { it.copy(notes = it.notes - id) }
         pump()
     }

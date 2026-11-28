@@ -306,6 +306,12 @@ class DatabaseRepositoryImpl @Inject constructor(
         send(DbQueryAll(_position.value.moves))
     }
 
+    override suspend fun refreshBetweenSearches() {
+        if (!canQuery()) return
+        pairing.onQuery(System.currentTimeMillis())
+        send(DbQueryAll(_position.value.moves))
+    }
+
     override suspend fun queryValue(): DbOpResult = guarded(write = false) {
         send(DbQueryOne(_position.value.moves))
     }

@@ -34,6 +34,15 @@ interface DatabaseRepository {
     /** Re-run the query for the current position. */
     suspend fun refresh()
 
+    /**
+     * The same query, for a caller that knows the engine is idle this instant
+     * even though the connection still reads `Thinking` — between two analyses,
+     * after the old search ended and before the new board goes out
+     * ([dev.gomoku.zenyth.core.model.AnalyzeParams.beforeSearch]). [refresh]
+     * would defer it to the end of the next search.
+     */
+    suspend fun refreshBetweenSearches() = refresh()
+
     /** `dbval`: fetch the single stored record for the current position. */
     suspend fun queryValue(): DbOpResult
 

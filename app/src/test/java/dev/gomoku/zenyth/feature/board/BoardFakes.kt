@@ -195,6 +195,12 @@ internal class FakeDatabase : DatabaseRepository {
         refreshes++
     }
 
+    var betweenSearches = 0
+
+    override suspend fun refreshBetweenSearches() {
+        betweenSearches++
+    }
+
     override suspend fun queryValue() = DbOpResult.Sent
     override suspend fun queryComment() = DbOpResult.Sent
     override suspend fun editComment(comment: String) = DbOpResult.Sent

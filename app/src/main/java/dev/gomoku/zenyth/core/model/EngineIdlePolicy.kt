@@ -19,6 +19,20 @@ object EngineIdlePolicy {
 
     const val PARK_AFTER_MS = 3 * 60_000L
 
+    /** Minutes an analysis may run with the app out of sight (0 = no limit); the setting's default. */
+    const val BACKGROUND_STOP_DEFAULT_MIN = 30
+
+    /** The choices the setting offers, 0 being «끔». */
+    val BACKGROUND_STOP_CHOICES = listOf(0, 10, 30, 60)
+
+    /**
+     * How long to let an analysis run before stopping it, or null when it is left
+     * alone: the app is in sight, nothing is analysing, or the limit is off. Game
+     * moves, reviews and proofs are not analyses and are never cut short here.
+     */
+    fun backgroundStopAfterMs(foreground: Boolean, analysing: Boolean, limitMin: Int): Long? =
+        if (foreground || !analysing || limitMin <= 0) null else limitMin * 60_000L
+
     /**
      * Whether the session is idle and out of sight: the app is in the background and
      * the engine is up (or trying to come back) but not searching.

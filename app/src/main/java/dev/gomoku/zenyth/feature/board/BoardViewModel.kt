@@ -9,6 +9,7 @@ import dev.gomoku.zenyth.core.common.IncomingLinks
 import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.core.model.AnalysisSnapshot
 import dev.gomoku.zenyth.core.model.AnalyzeParams
+import dev.gomoku.zenyth.core.model.BeforeSearch
 import dev.gomoku.zenyth.core.model.BoardMode
 import dev.gomoku.zenyth.core.model.BoardShift
 import dev.gomoku.zenyth.core.model.BoardSymmetry
@@ -660,7 +661,11 @@ class BoardViewModel @Inject constructor(
     private fun startAnalysis(defend: Boolean = false) {
         // Only a search still running answers its cancellation with a move; one
         // that already settled would leave the count to swallow the next real reply.
-        if (analyzing.value && searchLive) omitSettles++
+        // Taking over from a running search: the board's database query was
+        // deferred by it (setPosition sees `Thinking`), so it rides in the gap
+        // between the two searches instead of waiting for this one to end.
+        val handover = analyzing.value && searchLive
+        if (handover) omitSettles++
         searchLive = true
         stopFallbackJob?.cancel()
         analyzeJob?.cancel()
@@ -672,7 +677,13 @@ class BoardViewModel @Inject constructor(
         val ply = target.moves.size
         val limit = analysisSecPref.value * 1000L
         analyzeJob = viewModelScope.launch {
-            repository.analyze(target, AnalyzeParams(settings.value.multiPv, defend, timeLimitMs = limit))
+            val params = AnalyzeParams(
+                settings.value.multiPv,
+                defend,
+                timeLimitMs = limit,
+                beforeSearch = if (handover) BeforeSearch { database.refreshBetweenSearches() } else null,
+            )
+            repository.analyze(target, params)
                 .collect { snap ->
                     reading.value = Read(target.moves, snap)
                     snap.blackWinRate()?.let {

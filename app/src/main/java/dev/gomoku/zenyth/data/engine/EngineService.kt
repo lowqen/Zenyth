@@ -50,10 +50,18 @@ class EngineService : LifecycleService() {
         // A library write-back (L5-4) holds the service up past the session's end:
         // the copy to the SAF folder must finish with this priority.
         lifecycleScope.launch {
-            combine(repository.state, repository.health, repository.thermalThreads, keepAlive.holds) { st, health, heat, holds ->
-                Snapshot(st, health, heat, holds.isNotEmpty())
-            }.collectLatest { (st, health, heat, held) ->
-                if (st is ConnectionState.Disconnected && !health.reconnecting && !held) {
+            // Lives by the user's intent, not the link's state: every connect
+            // passes through `Disconnected` before `Connecting`, and a service
+            // that stopped there left the engine running in a cached app (L5-6).
+            combine(
+                combine(repository.state, repository.sessionWanted) { s, w -> s to w },
+                repository.health,
+                repository.thermalThreads,
+                keepAlive.holds,
+            ) { (st, wanted), health, heat, holds ->
+                Snapshot(st, wanted, health, heat, holds.isNotEmpty())
+            }.collectLatest { (st, wanted, health, heat, held) ->
+                if (!wanted && st !is ConnectionState.Thinking && !health.reconnecting && !held) {
                     stopSelf()
                 } else {
                     startAsForeground(st, health, heat, held)
@@ -68,7 +76,13 @@ class EngineService : LifecycleService() {
         return START_NOT_STICKY
     }
 
-    private data class Snapshot(val state: ConnectionState, val health: LinkHealth, val heat: Int?, val held: Boolean)
+    private data class Snapshot(
+        val state: ConnectionState,
+        val wanted: Boolean,
+        val health: LinkHealth,
+        val heat: Int?,
+        val held: Boolean,
+    )
 
     private fun startAsForeground(state: ConnectionState, health: LinkHealth, heat: Int?, held: Boolean) {
         ServiceCompat.startForeground(

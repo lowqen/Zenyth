@@ -48,7 +48,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -164,8 +166,14 @@ class EngineRepositoryImpl @Inject constructor(
      * [disconnect]. Everything the reconnect loop does is gated on it, so a
      * deliberate hang-up is never undone by the retry.
      */
-    @Volatile
-    private var wantsConnection = false
+    private val _sessionWanted = MutableStateFlow(false)
+    override val sessionWanted: StateFlow<Boolean> = _sessionWanted.asStateFlow()
+
+    private var wantsConnection: Boolean
+        get() = _sessionWanted.value
+        set(value) {
+            _sessionWanted.value = value
+        }
 
     @Volatile
     private var lastLineAt = 0L
@@ -186,6 +194,13 @@ class EngineRepositoryImpl @Inject constructor(
 
     /** Rapfi is searching, as its replies say; see [awaitIdle]. */
     private val searching = MutableStateFlow(false)
+
+    /** Analyses whose search went out and whose collector is still there (see [analyze]). */
+    private val analysesOut = MutableStateFlow(0)
+
+    override val analysisRunning: StateFlow<Boolean> =
+        combine(analysesOut, searching) { out, busy -> out > 0 && busy }
+            .stateIn(scope, SharingStarted.Eagerly, false)
 
     private val _console = MutableSharedFlow<ConsoleLine>(
         replay = CONSOLE_REPLAY,
@@ -310,10 +325,14 @@ class EngineRepositoryImpl @Inject constructor(
         if (target == lastTarget && wantsConnection && (now.isLive || now is ConnectionState.Connecting)) return
         lastTarget = target
         publishThermal()
+        // The transport first: for the local engine it reads the library's
+        // attachment from disk (bootPath), and nothing should sit between the
+        // service starting and the connection saying it is connecting.
+        val transport = transportFor(target)
         wantsConnection = true
         EngineService.start(context)
         try {
-            connection.open(transportFor(target))
+            connection.open(transport)
             handshake()
             _health.value = LinkHealth()
             if (target.isLocal) memoryGuard.sessionOpened()
@@ -517,6 +536,9 @@ class EngineRepositoryImpl @Inject constructor(
                 // A search still running: stop it and let it finish before this
                 // one's board goes out, or Rapfi throws the board away.
                 awaitIdle()
+                // The engine is idle only here between two analyses: what must
+                // be answered at once (the board's database query) goes now.
+                params.beforeSearch?.let { hook -> runCatching { hook.run() } }
                 // settings.txt line 25: drop the TT first when the user asked for it,
                 // so a search cannot be biased by the previous position's entries.
                 if (settingsRepository.settings.value.hashAutoClear) {
@@ -535,11 +557,13 @@ class EngineRepositoryImpl @Inject constructor(
                     dispatch(EngineCommand.YxNbest(params.multiPv.coerceAtLeast(1)))
                 }
                 connection.markThinking()
+                analysesOut.update { it + 1 }
                 g
             }
 
             awaitClose {
                 collector.cancel()
+                analysesOut.update { it - 1 }
                 scope.launch(NonCancellable) {
                     searchLock.withLock {
                         // Superseded: the newer analysis already stopped this search.

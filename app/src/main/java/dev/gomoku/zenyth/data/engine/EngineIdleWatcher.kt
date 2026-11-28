@@ -5,6 +5,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import dev.gomoku.zenyth.core.model.ConnectionState
 import dev.gomoku.zenyth.core.model.EngineIdlePolicy
+import dev.gomoku.zenyth.data.prefs.UiPrefs
 import dev.gomoku.zenyth.domain.repository.DatabaseRepository
 import dev.gomoku.zenyth.domain.repository.EngineRepository
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +32,7 @@ import javax.inject.Singleton
 class EngineIdleWatcher @Inject constructor(
     private val engine: EngineRepository,
     private val database: DatabaseRepository,
+    private val prefs: UiPrefs,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -56,6 +58,22 @@ class EngineIdleWatcher @Inject constructor(
                     if (idle) {
                         delay(EngineIdlePolicy.PARK_AFTER_MS)
                         engine.park()
+                    }
+                }
+        }
+        // An analysis left running out of sight stops after the user's limit —
+        // the service keeps it alive, this keeps it from running all night.
+        // Stopping it is the same YXSTOP as the pause button; the board settles
+        // it without playing the move (only a stop the user asked for plays).
+        scope.launch {
+            combine(foreground, engine.analysisRunning, prefs.backgroundAnalysisStopMin.state) { fg, analysing, limit ->
+                EngineIdlePolicy.backgroundStopAfterMs(fg, analysing, limit)
+            }
+                .distinctUntilChanged()
+                .collectLatest { after ->
+                    if (after != null) {
+                        delay(after)
+                        runCatching { engine.stop() }
                     }
                 }
         }

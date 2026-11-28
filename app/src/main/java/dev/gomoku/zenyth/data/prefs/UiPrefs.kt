@@ -3,6 +3,7 @@ package dev.gomoku.zenyth.data.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.gomoku.zenyth.core.model.EngineIdlePolicy
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,14 @@ class UiPrefs @Inject constructor(
 
     /** Connect to the last engine when the app opens (Zenyth Web's auto boot). */
     val autoStartEngine: BoolPref get() = bool("engine.autostart", true)
+
+    /**
+     * An analysis left running with the app out of sight stops after this many
+     * minutes; 0 = never (L5-6 decision, 2026-11-28: on, 30). The foreground
+     * service keeps such a search alive — this is what keeps it from running
+     * all night on a phone in a pocket.
+     */
+    val backgroundAnalysisStopMin: IntPref get() = int("engine.bgstop.min", EngineIdlePolicy.BACKGROUND_STOP_DEFAULT_MIN)
 
     /**
      * «고급 사용자 모드» — off by default (user request, 2026-10-29). Since L5-5 it

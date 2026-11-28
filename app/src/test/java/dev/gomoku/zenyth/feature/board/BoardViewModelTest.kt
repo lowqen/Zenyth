@@ -193,6 +193,21 @@ class BoardViewModelTest {
     }
 
     @Test
+    fun `a move during an analysis queries the database between the two searches`() = boardTest { h ->
+        h.board(h8)
+        h.act { onStartAnalyze() }
+        // Started from idle: setPosition's own query already went out.
+        assertThat(h.engine.analyses.single().second.beforeSearch).isNull()
+
+        h.board(h8, g7)
+        assertThat(h.engine.analyses).hasSize(2)
+        val hook = h.engine.analyses[1].second.beforeSearch
+        assertThat(hook).isNotNull()
+        hook!!.run()
+        assertThat(h.database.betweenSearches).isEqualTo(1)
+    }
+
+    @Test
     fun `searchdefend is an analysis that asks for every defence`() = boardTest { h ->
         h.board(h8)
         h.act { onSearchDefend() }

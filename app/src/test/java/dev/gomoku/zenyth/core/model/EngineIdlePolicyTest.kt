@@ -44,4 +44,21 @@ class EngineIdlePolicyTest {
     fun `the wait is a few minutes`() {
         assertThat(EngineIdlePolicy.PARK_AFTER_MS).isEqualTo(3 * 60_000L)
     }
+
+    @Test
+    fun `an analysis out of sight stops after the limit, and only then`() {
+        assertThat(EngineIdlePolicy.backgroundStopAfterMs(foreground = false, analysing = true, limitMin = 30))
+            .isEqualTo(30 * 60_000L)
+        // On screen, nothing running, or the limit off: left alone.
+        assertThat(EngineIdlePolicy.backgroundStopAfterMs(foreground = true, analysing = true, limitMin = 30)).isNull()
+        assertThat(EngineIdlePolicy.backgroundStopAfterMs(foreground = false, analysing = false, limitMin = 30)).isNull()
+        assertThat(EngineIdlePolicy.backgroundStopAfterMs(foreground = false, analysing = true, limitMin = 0)).isNull()
+    }
+
+    @Test
+    fun `the background limit defaults to 30 minutes and offers off`() {
+        assertThat(EngineIdlePolicy.BACKGROUND_STOP_DEFAULT_MIN).isEqualTo(30)
+        assertThat(EngineIdlePolicy.BACKGROUND_STOP_CHOICES).contains(0)
+        assertThat(EngineIdlePolicy.BACKGROUND_STOP_CHOICES).contains(EngineIdlePolicy.BACKGROUND_STOP_DEFAULT_MIN)
+    }
 }
