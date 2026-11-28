@@ -46,6 +46,16 @@ class LibraryGoldenTest {
         val skipped = golden["openingsSkipped"]?.jsonPrimitive?.contentOrNull
         assertThat(r.openingsUnordered).isEqualTo(skipped == "unordered")
 
+        // Root keys dropped in pass 2 (past the cap) and read again at the end: the same roots.
+        // The hash table is gone by then, so they are matched by record number — this used to
+        // read the freed bloom filter and fail the whole count (web: silently empty keys).
+        val d = YxdbIndex.scan({ ByteArrayInputStream(db) }, db.size.toLong(), rootKeyCap = 0)
+        assertThat(d.stats).isEqualTo(want)
+        val few = YxdbIndex.scan({ ByteArrayInputStream(db) }, db.size.toLong(), rootsTop = 3)
+        val fewDropped = YxdbIndex.scan({ ByteArrayInputStream(db) }, db.size.toLong(), rootsTop = 3, rootKeyCap = 0)
+        assertThat(fewDropped.stats.roots).isEqualTo(few.stats.roots)
+        assertThat(fewDropped.stats.roots!!.all { it.key.isNotEmpty() }).isTrue()
+
         // Stats alone (L5-1 fast path: shared slots unread) — the same numbers without openings · roots.
         val s = YxdbIndex.scan({ ByteArrayInputStream(db) }, db.size.toLong(), index = false)
         assertThat(s.stats).isEqualTo(want.copy(openings = null, roots = null))

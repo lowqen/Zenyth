@@ -153,6 +153,8 @@ object YxdbIndex {
         index: Boolean = true,
         maxIndexBytes: Long = Long.MAX_VALUE,
         rootsTop: Int = 32,
+        /** Rough byte cap on root keys gathered in pass 2; past it they are dropped and read again at the end. Tests lower it. */
+        rootKeyCap: Long = ROOT_KEY_CAP,
         verify: Boolean = false,
         onClassified: ClassifiedFn? = null,
         onProgress: ((ScanProgress) -> Unit)? = null,
@@ -266,10 +268,12 @@ object YxdbIndex {
             val ql = IntArray(1024)
             val qs = IntArray(1024)
             records = 0
+            var rec = -1 // record number (special and repeated ones too) — a root keeps ~rec in parent
             open().use { input ->
                 Yxdb.read(
                     input, total,
                     onRecord = { b, ko, kl, vo, vl, _ ->
+                        rec++
                         if (!hasher.load(b, ko, kl)) {
                             onClassified?.classified(b, ko, kl, vo, vl, if (Yxdb.isMetaKey(b, ko, kl)) -1 else UNCLASSIFIED)
                             return@read true
@@ -319,7 +323,7 @@ object YxdbIndex {
                                 op = pj
                             }
                         }
-                        parent[own] = first
+                        parent[own] = if (first < 0) rec.inv() else first
                         val o = when {
                             !cls || n < 3 -> UNCLASSIFIED
                             n == 3 -> classifyKey(hasher)
@@ -334,7 +338,7 @@ object YxdbIndex {
                         }
                         if (first < 0 && !rootKeysDropped) {
                             rootKeyBytes += kl * 2L + 32
-                            if (rootKeyBytes > ROOT_KEY_CAP) {
+                            if (rootKeyBytes > rootKeyCap) {
                                 rootKeysDropped = true
                                 rootKeys.clear()
                             } else {
@@ -359,7 +363,7 @@ object YxdbIndex {
             val topZ = LongArray(rootsTop)
             var topN = 0
             for (sl in 0 until ix.m) {
-                if (parent[sl] != -1 || !ix.visited(sl)) continue
+                if (parent[sl] >= 0 || !ix.visited(sl)) continue
                 val z = ix.subtreeOf(sl)
                 if (topN == rootsTop && z <= topZ[topN - 1]) continue
                 var i = topN
@@ -373,19 +377,24 @@ object YxdbIndex {
                 topZ[i] = z
                 if (topN < rootsTop) topN++
             }
+            // Root keys, if pass 2 dropped them. The hash table is gone (hi = size, bloom
+            // freed), so no find: the record number pass 2 left in parent (~rec) picks them.
             if (rootKeysDropped && topN > 0) {
-                val want = HashSet<Int>()
-                for (i in 0 until topN) want.add(topS[i])
+                val want = HashMap<Int, Int>() // record number → slot
+                var last = 0
+                for (i in 0 until topN) {
+                    val r = parent[topS[i]].inv()
+                    want[r] = topS[i]
+                    last = maxOf(last, r)
+                }
+                var at = -1
                 open().use { input ->
                     Yxdb.read(
                         input, total,
                         onRecord = { b, ko, kl, _, _, _ ->
-                            if (!hasher.load(b, ko, kl)) return@read true
-                            hasher.hash()
-                            hasher.canon()
-                            val sl = ix.find(hasher.hi, hasher.lo)
-                            if (want.remove(sl)) rootKeys[sl] = YxdbKey.toHex(b, ko, kl)
-                            want.isNotEmpty()
+                            at++
+                            want[at]?.let { rootKeys[it] = YxdbKey.toHex(b, ko, kl) }
+                            at < last
                         },
                         onChunk = { loaded, tot -> if (tot > 0) progress(ScanPhase.ROOTS, loaded.toDouble() / tot) },
                         isCancelled = cancelledOrDropped,
