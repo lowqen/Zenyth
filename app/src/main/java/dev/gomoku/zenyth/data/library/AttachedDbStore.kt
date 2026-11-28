@@ -197,10 +197,12 @@ class AttachedDbStore(
 
     /** A new «내 DB» in app storage — an entry with no file yet. */
     suspend fun newAppEntry(title: String): AttachedDb {
-        val manifest = app.readManifest()
         val made = LibraryEntries.newEntry(title, "", LibraryCover.ECLIPSE, clock())
         val entry = made.copy(file = AppDirSource.fileNameOf(made.id))
-        app.writeManifest(manifest.copy(entries = manifest.entries + entry))
+        ManifestLocks.with(app.id) {
+            val manifest = app.readManifest()
+            app.writeManifest(manifest.copy(entries = manifest.entries + entry))
+        }
         return AttachedDb(entry.id, AppDirSource.ID, app.fileOf(entry.file).absolutePath)
     }
 

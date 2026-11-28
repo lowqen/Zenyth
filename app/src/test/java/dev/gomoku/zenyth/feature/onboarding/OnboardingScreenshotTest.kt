@@ -77,7 +77,7 @@ class OnboardingScreenshotTest(private val variant: Variant) {
         }
     }
 
-    /** The tour's four pages (O3): rows, the two pictured parts, dots, the pill. */
+    /** The tour's pages (O3): rows, the two pictured parts, dots, the pill. */
     @Test
     fun tourBoard() = screen("tour_board") { tour(TourPage.Board) }
 
@@ -86,6 +86,9 @@ class OnboardingScreenshotTest(private val variant: Variant) {
 
     @Test
     fun tourJoseki() = screen("tour_joseki") { tour(TourPage.Joseki) }
+
+    @Test
+    fun tourLibrary() = screen("tour_library") { tour(TourPage.Library) }
 
     /** The last page: no «건너뛰기», «완료» in the pill. */
     @Test

@@ -236,7 +236,7 @@ fun BoardScreen(
     }
     val pro = LocalProMode.current
     val cards: @Composable ColumnScope.(Boolean) -> Unit = { wide ->
-        if (ui.linkBackup) LinkBackupCard(viewModel::onRestoreLinkBackup, viewModel::onDropLinkBackup)
+        if (ui.linkBackup) LinkBackupCard(ui.linkBackupTitle, viewModel::onRestoreLinkBackup, viewModel::onDropLinkBackup)
         // Wide: the position card leads. Narrow: one line instead, the card after
         // the tab's own card, so «지금 두기» is never pushed off the screen.
         if (wide) {

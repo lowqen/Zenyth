@@ -3,7 +3,10 @@ package dev.gomoku.zenyth.navigation
 import dev.gomoku.zenyth.feature.board.MiniAnalysisBar
 import dev.gomoku.zenyth.feature.board.ResearchMiniBar
 import dev.gomoku.zenyth.feature.board.BoardViewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
@@ -61,6 +64,9 @@ import dev.gomoku.zenyth.domain.repository.SettingsRepository
 import dev.gomoku.zenyth.feature.board.BoardScreen
 import dev.gomoku.zenyth.feature.connection.ConnectionViewModel
 import dev.gomoku.zenyth.feature.database.DatabaseScreen
+import dev.gomoku.zenyth.feature.library.LibraryDetailScreen
+import dev.gomoku.zenyth.feature.library.LibraryScreen
+import dev.gomoku.zenyth.feature.library.LibraryViewModel
 import dev.gomoku.zenyth.feature.joseki.JosekiScreen
 import dev.gomoku.zenyth.feature.settings.SettingsScreen
 import javax.inject.Inject
@@ -255,8 +261,32 @@ fun ZenythRoot() {
                         composable(Destination.Joseki.route) { JosekiScreen() }
                         // The library tab's own graph, so a page under it keeps the
                         // tab lit and its stack survives a trip to another tab.
-                        // Until the library's first page (L5-6) it opens on the editor.
-                        navigation(route = Destination.Library.route, startDestination = Routes.LIBRARY_EDIT) {
+                        // One LibraryViewModel for the graph: the grid and a page
+                        // read the same notices and selection (L5-6).
+                        navigation(route = Destination.Library.route, startDestination = Routes.LIBRARY_HOME) {
+                            composable(Routes.LIBRARY_HOME) { entry ->
+                                val vm = libraryViewModel(navController, entry)
+                                LibraryScreen(
+                                    viewModel = vm,
+                                    onOpenDetail = { id -> navController.navigate(Routes.libraryDetail(id)) },
+                                    onBoard = { onSelect(Destination.Board) },
+                                    onEditor = { navController.navigate(Routes.LIBRARY_EDIT) },
+                                )
+                            }
+                            composable(
+                                Routes.LIBRARY_DETAIL,
+                                arguments = listOf(navArgument("id") { type = NavType.StringType }),
+                            ) { entry ->
+                                val vm = libraryViewModel(navController, entry)
+                                val id = entry.arguments?.getString("id").orEmpty()
+                                LibraryDetailScreen(
+                                    viewModel = vm,
+                                    id = id,
+                                    onBack = { navController.popBackStack() },
+                                    onBoard = { onSelect(Destination.Board) },
+                                    onEditor = { navController.navigate(Routes.LIBRARY_EDIT) },
+                                )
+                            }
                             composable(Routes.LIBRARY_EDIT) { DatabaseScreen() }
                         }
                         composable(Destination.Settings.route) { SettingsScreen() }
@@ -276,6 +306,15 @@ fun ZenythRoot() {
             }
         }
     }
+}
+
+/** The library graph's one view model, kept by the graph's own entry. */
+@Composable
+private fun libraryViewModel(navController: NavHostController, entry: NavBackStackEntry): LibraryViewModel {
+    val parent = remember(entry) {
+        runCatching { navController.getBackStackEntry(Destination.Library.route) }.getOrDefault(entry)
+    }
+    return hiltViewModel(parent)
 }
 
 /** [ResearchMiniBar] for the board tab's view model, found as [BoardMiniBar] finds it. */

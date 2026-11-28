@@ -47,13 +47,18 @@ enum class Destination(
 
 /** Routes that are not tabs of their own (design §6.1). */
 object Routes {
-    /**
-     * The position editor — the old DB tab. The library tab's graph starts here
-     * until the library's own first page (L5-6) takes the start.
-     */
+    /** The library's first page — the graph's start (L5-6). */
+    const val LIBRARY_HOME = "library/home"
+
+    /** A library entry's page (narrow screens; wide ones show it beside the grid). */
+    const val LIBRARY_DETAIL = "library/db/{id}"
+
+    fun libraryDetail(id: String): String = "library/db/" + android.net.Uri.encode(id)
+
+    /** The position editor — the old DB tab, under the library since L5-6. */
     const val LIBRARY_EDIT = "library/edit"
 
-    /** The old DB tab: a saved back stack or an old link lands on [LIBRARY_EDIT]. */
+    /** The old DB tab: a saved back stack or an old link lands on the library tab. */
     const val LEGACY_DATABASE = "database"
 
     /** The old engine tab: lands on the board with its «로그» pane open. */

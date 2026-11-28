@@ -65,6 +65,11 @@ android {
     }
 
     buildTypes {
+        // A debug build installs beside the released app (L5-6, decided
+        // 2026-11-25): its own ID, its own data, its own name on the launcher.
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             if (keystoreProperties != null) {
                 signingConfig = signingConfigs.getByName("release")

@@ -309,9 +309,9 @@ internal fun PositionStrip(ui: PositionStripUi, modifier: Modifier = Modifier) {
 internal fun PositionStrip(ui: BoardUiState, modifier: Modifier = Modifier) = PositionStrip(ui.positionStripUi(), modifier)
 /** «링크로 연 판» — the board a link replaced, until the user decides. */
 @Composable
-internal fun LinkBackupCard(onRestore: () -> Unit, onDrop: () -> Unit) {
+internal fun LinkBackupCard(title: String?, onRestore: () -> Unit, onDrop: () -> Unit) {
     CalmCard {
-        Text(tr("링크의 국면을 열었습니다", "Opened the linked position", "已打开链接中的局面"), style = MaterialTheme.typography.titleSmall)
+        Text(title ?: tr("링크의 국면을 열었습니다", "Opened the linked position", "已打开链接中的局面"), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onRestore) { Text(tr("두던 판으로 돌아가기", "Back to my board", "回到原来的棋盘")) }
             TextButton(onClick = onDrop) { Text(tr("버리기", "Discard", "丢弃")) }

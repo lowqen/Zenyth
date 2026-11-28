@@ -79,6 +79,7 @@ internal class BoardUiMapper(private val liveRecords: () -> List<PositionRecord>
             moveGrade = quality?.takeIf { it != MoveQuality.NONE },
             gameName = p.gameName,
             linkBackup = p.linkBackup,
+            linkBackupTitle = p.linkBackupTitle,
             db = p.db,
             dbValue = p.db.value,
             notice = p.notice,

@@ -30,15 +30,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.OfflineBolt
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.Thermostat
@@ -61,6 +64,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.gomoku.zenyth.core.designsystem.cover.DbCover
+import dev.gomoku.zenyth.domain.library.CoverKey
 import dev.gomoku.zenyth.core.designsystem.component.Button
 import dev.gomoku.zenyth.core.designsystem.component.EngineChip
 import dev.gomoku.zenyth.core.designsystem.component.MiniBoard
@@ -81,14 +86,14 @@ import kotlinx.coroutines.launch
 val LocalOpenTour: ProvidableCompositionLocal<(() -> Unit)?> = staticCompositionLocalOf { null }
 
 /**
- * The four places the tour shows, in the bottom bar's order — the engine last,
+ * The places the tour shows, in the bottom bar's order — the engine last,
  * though since L5-5 it is not a tab: its place is the board sheet's «로그» pane
- * and Settings ▸ 엔진. (The library gets its page with its screen, L5-6.)
+ * and Settings ▸ 엔진. The library got its page with its screen (L5-6).
  */
-enum class TourPage { Board, Research, Joseki, Engine }
+enum class TourPage { Board, Research, Joseki, Library, Engine }
 
 /**
- * The tour of the four places (docs/engineering-notes.md §6, O3), as Mornye's tour looks:
+ * The tour of the places (docs/engineering-notes.md §6, O3), as Mornye's tour looks:
  * back and «건너뛰기» on top, a page that slides under the finger, the dots,
  * one full-width pill. Opened from Settings ▸ 정보, never on its own — the
  * first run is the two setup screens and then the board.
@@ -229,6 +234,18 @@ private fun TourPageBody(page: TourPage) {
                         Triple(Icons.Outlined.Link, tr("레슨 링크", "Lesson links", "课程链接"),
                             tr("Zenyth Web 의 레슨 링크를 누르면 앱에서 열립니다", "A Zenyth Web lesson link opens in the app", "点击 Zenyth Web 的课程链接会在应用中打开")),
                     )
+                    TourPage.Library -> {
+                        CoversPicture()
+                        Spacer(Modifier.height(28.dp))
+                        Rows(
+                            Triple(Icons.Outlined.PlayCircle, tr("열면 붙습니다", "Open to attach", "打开即连接"),
+                                tr("DB 를 열면 엔진이 그 DB 를 쓰고, 판은 그 DB 의 시작 국면으로 갑니다", "Opening a DB attaches it to the engine and takes the board to its start", "打开数据库后引擎即使用它，棋盘转到其起始局面")),
+                            Triple(Icons.Outlined.FolderOpen, tr("폴더도 함께", "Folders too", "也可用文件夹"),
+                                tr("PC 와 나누는 폴더를 더하면 그 폴더의 .db 가 같은 이름 · 커버로 보입니다", "Add a folder you share with a PC and its .db files show with the same names and covers", "添加与电脑共享的文件夹，其中的 .db 会以相同名称与封面显示")),
+                            Triple(Icons.Outlined.Delete, tr("휴지통", "Trash", "回收站"),
+                                tr("지운 DB 는 30일 동안 되돌릴 수 있습니다", "A deleted DB can be restored for 30 days", "删除的数据库 30 天内可以恢复")),
+                        )
+                    }
                     TourPage.Engine -> {
                         EnginePicture()
                         Spacer(Modifier.height(28.dp))
@@ -267,6 +284,15 @@ private fun TourPage.head(): Triple<ImageVector, String, String> = when (this) {
         Icons.AutoMirrored.Filled.MenuBook,
         tr("정석", "Joseki", "定式"),
         tr("정해진 수순을 배우고, 내 정석을 모읍니다", "Learn the set sequences and keep your own", "学习定式，收藏自己的定式"),
+    )
+    TourPage.Library -> Triple(
+        Icons.Filled.Inventory2,
+        tr("라이브러리", "Library", "资料库"),
+        tr(
+            "DB 를 커버로 모아 두고, 고른 DB 를 엔진에 붙입니다. 커버의 색은 그 DB 에 가장 많은 주형입니다",
+            "Your DBs as covers; the one you open is the engine's. A cover's colour is the DB's most frequent opening",
+            "数据库以封面陈列，打开的那个交给引擎。封面颜色是该数据库中最多的开局",
+        ),
     )
     TourPage.Engine -> Triple(
         Icons.Filled.OfflineBolt,
@@ -328,6 +354,16 @@ private fun BoardPicture() = PictureCard {
             Text("J10", style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp))
             PillBadge(tr("승률 71% · 깊이 18", "Win 71% · depth 18", "胜率 71% · 深度 18"), accent = true)
         }
+    }
+}
+
+/** The library page's picture: three covers — two openings and an eclipse. */
+@Composable
+private fun CoversPicture() = PictureCard {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
+        DbCover(CoverKey(4), Modifier.size(84.dp), corner = 14.dp)
+        DbCover(CoverKey(16), Modifier.size(84.dp), corner = 14.dp)
+        DbCover(CoverKey.E0, Modifier.size(84.dp), seed = 6, corner = 14.dp)
     }
 }
 

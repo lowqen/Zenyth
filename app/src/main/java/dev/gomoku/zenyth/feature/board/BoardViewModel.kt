@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.gomoku.zenyth.core.common.BoardHandoff
 import dev.gomoku.zenyth.core.common.IncomingLinks
 import dev.gomoku.zenyth.core.i18n.tr
 import dev.gomoku.zenyth.core.model.AnalysisSnapshot
@@ -121,8 +122,11 @@ class BoardViewModel @Inject constructor(
     private val analysisSecPref = uiPrefs.int("analysis.sec", 0)
     private val playBestPref = uiPrefs.bool("analysis.playBestOnStop", true)
 
-    /** The board a link replaced, kept until the user keeps or drops it. */
-    private val linkBackup = MutableStateFlow<List<Move>?>(null)
+    /** The board a link (or the library) replaced, kept until the user keeps or drops it. */
+    private val linkBackup = MutableStateFlow<LinkBackup?>(null)
+
+    /** [moves] = the board that was replaced; [title] heads the card that offers it back. */
+    private data class LinkBackup(val moves: List<Move>, val title: String)
 
     /**
      * Per-ply evaluation history — the desktop's `wrhistory`/`wrmate`/`wrvalid`
@@ -156,6 +160,7 @@ class BoardViewModel @Inject constructor(
         val analysisSec: Int,
         val playBest: Boolean,
         val linkBackup: Boolean,
+        val linkBackupTitle: String?,
     )
 
     private val panel = combine(
@@ -190,6 +195,7 @@ class BoardViewModel @Inject constructor(
             analysisSec = values[19] as Int,
             playBest = values[20] as Boolean,
             linkBackup = values[21] != null,
+            linkBackupTitle = (values[21] as LinkBackup?)?.title,
         )
     }
 
@@ -230,6 +236,8 @@ class BoardViewModel @Inject constructor(
 
         // A Zenyth Web link the app was opened with.
         links.pending.filterNotNull().onEach { onOpenLink(it) }.launchIn(viewModelScope)
+        // A line from the library («이 DB 열기»).
+        links.position.filterNotNull().onEach { onOpenHandoff(it) }.launchIn(viewModelScope)
     }
 
     // ---- tabs --------------------------------------------------------------
@@ -462,15 +470,29 @@ class BoardViewModel @Inject constructor(
             _notice.value = tr("링크의 국면을 읽을 수 없습니다", "The link's position could not be read", "无法读取链接中的局面")
             return
         }
-        if (pos.moves.isNotEmpty() && pos.moves != moves) linkBackup.value = pos.moves
+        val opened = tr("링크의 국면을 열었습니다", "Opened the linked position", "已打开链接中的局面")
+        if (pos.moves.isNotEmpty() && pos.moves != moves) linkBackup.value = LinkBackup(pos.moves, opened)
         applyLine(moves)
-        _notice.value = tr("링크의 국면을 열었습니다", "Opened the linked position", "已打开链接中的局面")
+        _notice.value = opened
+    }
+
+    /**
+     * A line handed over by another screen — the library's «이 DB 열기» on the
+     * record's start (design §6.3). Like a link: a board with stones on it is
+     * kept aside with «두던 판으로 돌아가기 · 버리기».
+     */
+    fun onOpenHandoff(handoff: BoardHandoff) {
+        links.consumePosition()
+        val pos = position.value
+        if (pos.moves.isNotEmpty() && pos.moves != handoff.moves) linkBackup.value = LinkBackup(pos.moves, handoff.title)
+        applyLine(handoff.moves)
+        _notice.value = handoff.title
     }
 
     fun onRestoreLinkBackup() {
         val backup = linkBackup.value ?: return
         linkBackup.value = null
-        applyLine(backup)
+        applyLine(backup.moves)
     }
 
     fun onDropLinkBackup() {

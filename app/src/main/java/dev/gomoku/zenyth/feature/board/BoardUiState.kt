@@ -56,6 +56,8 @@ data class BoardUiState(
     val gameName: String? = null,
     /** A link replaced the board; the board it replaced is kept until decided. */
     val linkBackup: Boolean = false,
+    /** What replaced it — the card's headline (a link, a library DB's start). */
+    val linkBackupTitle: String? = null,
     // ---- database (P7) ----
     val db: DbState = DbState(),
     /** Position value read from the database, used while the engine is idle. */

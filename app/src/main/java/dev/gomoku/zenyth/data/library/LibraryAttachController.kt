@@ -361,22 +361,25 @@ class LibraryAttachController(
         }
 
         val stamp = clock()
-        val manifest = source.readManifest()
-        val orig = manifest.entries.firstOrNull { it.id == m.entryId }
         val newFp = newBase.toFingerprint()
-        var entryId = m.entryId
-        if (!conflict) {
-            if (orig != null) {
-                val changed = orig.fingerprint?.tail != newFp.tail
-                val e = orig.copy(fingerprint = newFp, updatedAt = stamp).let { if (changed) it.withStats(null) else it }
-                source.writeManifest(manifest.copy(entries = manifest.entries.map { if (it.id == e.id) e else it }))
+        // The library screen writes this sidecar too (rename, cover, trash): one writer at a time.
+        val entryId = ManifestLocks.with(source.id) {
+            val manifest = source.readManifest()
+            val orig = manifest.entries.firstOrNull { it.id == m.entryId }
+            if (!conflict) {
+                if (orig != null) {
+                    val changed = orig.fingerprint?.tail != newFp.tail
+                    val e = orig.copy(fingerprint = newFp, updatedAt = stamp).let { if (changed) it.withStats(null) else it }
+                    source.writeManifest(manifest.copy(entries = manifest.entries.map { if (it.id == e.id) e else it }))
+                }
+                m.entryId
+            } else {
+                val title = conflictTitle(orig?.title ?: stemOf(m.name))
+                val made = LibraryEntries.newEntry(title, target, now = stamp)
+                val e = made.copy(cover = orig?.cover ?: made.cover, fingerprint = newFp)
+                source.writeManifest(manifest.copy(entries = manifest.entries + e))
+                e.id
             }
-        } else {
-            val title = conflictTitle(orig?.title ?: stemOf(m.name))
-            val made = LibraryEntries.newEntry(title, target, now = stamp)
-            val e = made.copy(cover = orig?.cover ?: made.cover, fingerprint = newFp)
-            source.writeManifest(manifest.copy(entries = manifest.entries + e))
-            entryId = e.id
         }
         store.updateMark(key) {
             it.copy(entryId = entryId, name = target, base = newBase, baseJournal = newBaseJ, dirty = saveEnds.value != gen)
